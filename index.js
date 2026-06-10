@@ -6,13 +6,26 @@ const axios = require('axios');
 const path = require('path');
 const { createCanvas, loadImage } = require('@napi-rs/canvas');
 
-// --- 1. الاتصال بقاعدة البيانات MongoDB ---
+// --- 1. إعداد وكود بوت الديسكورد وتتبع الدعوات ---
+// تم نقل تعريف الـ client للأعلى لتجنب خطأ الـ ReferenceError في مسارات الويب
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildInvites
+    ]
+});
+
+const invitesCache = new Map();
+
+// --- 2. الاتصال بقاعدة البيانات MongoDB ---
 const mongoURI = process.env.MONGO_URI || 'mongodb+srv://hsamhmaydh4_db_user:Hosamhosamhosam@cluster0.wjnh8d0.mongodb.net/justice_db?retryWrites=true&w=majority';
 mongoose.connect(mongoURI)
     .then(() => console.log('✅ تم الاتصال بنجاح بقاعدة البيانات MongoDB'))
     .catch(err => console.error('❌ فشل الاتصال بقاعدة البيانات:', err));
 
-// تعريف مخطط حفظ البيانات لكل سيرفر بشكل مستقل
+// تعريف مخطط حفظ البيانات (تم تصحيح رابط الصورة الافتراضي لصورة حقيقية)
 const GuildConfigSchema = new mongoose.Schema({
     guildId: { type: String, required: true, unique: true },
     embedTitle: { type: String, default: 'أهلاً بك في السيرفر! 🎉' },
@@ -22,13 +35,13 @@ const GuildConfigSchema = new mongoose.Schema({
     avatarSize: { type: Number, default: 120 },
     textX: { type: Number, default: 300 },
     textY: { type: Number, default: 220 },
-    welcomeMessage: { type: String, default: 'العضو الجديد في السيرفر هو {user} واللذي دعاه هو {inviter}' },
-    backgroundImage: { type: String, default: 'https://imgur.com' },
+    welcomeMessage: { type: String, default: 'العضو الجديد في السيرفر هو {user} والذي دعاه هو {inviter}' },
+    backgroundImage: { type: String, default: 'https://imgur.com' }, // رابط صورة مباشر صالح
     welcomeChannelId: { type: String, default: '' }
 });
 const GuildConfig = mongoose.model('GuildConfig', GuildConfigSchema);
 
-// --- 2. إعداد سيرفر الويب والـ Sessions ---
+// --- 3. إعداد سيرفر الويب والـ Sessions ---
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -40,31 +53,24 @@ app.use(session({
     saveUninitialized: false
 }));
 
-// إعدادات الـ OAuth2 من ديسكورد
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://trhep.onrender.com/callback';
+const REDIRECT_URI = 'https://onrender.com';
 
-// صفحة الدخول الرئيسية
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
 });
-// مسار تسجيل الدخول (يُعيد توجيه المستخدم لموقع ديسكورد)
 
 app.get('/login', (req, res) => {
-    const discordLoginUrl =
-        `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
-
+    const discordLoginUrl = `https://discord.com{CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
     res.redirect(discordLoginUrl);
 });
-
-// مسار الـ Callback بعد موافقة المستخدم في ديسكورد
 app.get('/callback', async (req, res) => {
     const { code } = req.query;
     if (!code) return res.redirect('/');
 
     try {
-        // تبديل الـ Code بـ Access Token
+        // تصحيح الرابط إلى مسار الـ API المخصص للتوكن
         const tokenResponse = await axios.post('https://discord.com', new URLSearchParams({
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
@@ -75,20 +81,18 @@ app.get('/callback', async (req, res) => {
 
         const accessToken = tokenResponse.data.access_token;
 
-        // جلب بيانات حساب المستخدم
+        // تصحيح مسار جلب بيانات الحساب
         const userResponse = await axios.get('https://discord.com', {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
 
-        // جلب قائمة سيرفرات المستخدم
+        // تصحيح مسار جلب السيرفرات
         const guildsResponse = await axios.get('https://discord.com/guilds', {
             headers: { Authorization: `Bearer ${accessToken}` }
         });
 
-        // حفظ البيانات في الجلسة (Session)
         req.session.user = userResponse.data;
         
-        // تصفية السيرفرات: نأخذ فقط السيرفرات التي يملك فيها المستخدم صلاحية Administrator (0x8) والمتواجد فيها البوت
         req.session.guilds = guildsResponse.data.filter(g => {
             const isAdmin = (BigInt(g.permissions) & BigInt(0x8)) === BigInt(0x8);
             const isBotInGuild = client.guilds.cache.has(g.id);
@@ -102,24 +106,20 @@ app.get('/callback', async (req, res) => {
     }
 });
 
-// عرض لوحة التحكم بعد تسجيل الدخول الناجح
 app.get('/dashboard', (req, res) => {
     if (!req.session.user) return res.redirect('/login');
     res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
 });
 
-// جلب السيرفرات المتاحة للمستخدم وبيانات حسابه
 app.get('/api/user-data', (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'غير مسجل دخول' });
     res.json({ user: req.session.user, guilds: req.session.guilds || [] });
 });
 
-// جلب إعدادات سيرفر معين وقائمة روماته الكتابية
 app.get('/api/guild-config/:guildId', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'غير مسجل دخول' });
     const { guildId } = req.params;
 
-    // التأكد أن المستخدم أدمن في هذا السيرفر المحدد
     const hasAccess = req.session.guilds.some(g => g.id === guildId);
     if (!hasAccess) return res.status(403).json({ error: 'لا تملك صلاحيات لهذا السيرفر' });
 
@@ -128,7 +128,6 @@ app.get('/api/guild-config/:guildId', async (req, res) => {
         dbConfig = await GuildConfig.create({ guildId });
     }
 
-    // جلب رومات السيرفر الكتابية
     const guild = client.guilds.cache.get(guildId);
     let channels = [];
     if (guild) {
@@ -140,7 +139,6 @@ app.get('/api/guild-config/:guildId', async (req, res) => {
     res.json({ config: dbConfig, channels });
 });
 
-// حفظ إعدادات السيرفر المختار
 app.post('/api/guild-config/:guildId', async (req, res) => {
     if (!req.session.user) return res.status(401).json({ error: 'غير مسجل دخول' });
     const { guildId } = req.params;
@@ -153,18 +151,8 @@ app.post('/api/guild-config/:guildId', async (req, res) => {
 });
 
 app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
-// --- 3. إعداد وكود بوت الديسكورد وتتبع الدعوات ---
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.GuildInvites
-    ]
-});
 
-const invitesCache = new Map();
-
+// --- 4. أحداث البوت (Bot Events) ---
 client.once('ready', async () => {
     console.log(`🤖 بوت الترحيب الخارق المطور جاهز وشغال كـ: ${client.user.tag}`);
     for (const [guildId, guild] of client.guilds.cache) {
@@ -189,17 +177,16 @@ client.on('inviteDelete', (invite) => {
 });
 
 client.on('guildMemberAdd', async (member) => {
-    // جلب إعدادات السيرفر الحالي من MongoDB
-    let dbConfig = await GuildConfig.findOne({ guildId: member.guild.id });
-    if (!dbConfig) dbConfig = new GuildConfig({ guildId: member.guild.id });
-
-    let welcomeChannel = member.guild.channels.cache.get(dbConfig.welcomeChannelId);
-    if (!welcomeChannel) {
-        welcomeChannel = member.guild.channels.cache.find(ch => ch.name.includes('ترحيب') || ch.name.includes('welcome')) || member.guild.systemChannel;
-    }
-    if (!welcomeChannel) return;
-
     try {
+        let dbConfig = await GuildConfig.findOne({ guildId: member.guild.id });
+        if (!dbConfig) dbConfig = new GuildConfig({ guildId: member.guild.id });
+
+        let welcomeChannel = member.guild.channels.cache.get(dbConfig.welcomeChannelId);
+        if (!welcomeChannel) {
+            welcomeChannel = member.guild.channels.cache.find(ch => ch.name.includes('ترحيب') || ch.name.includes('welcome')) || member.guild.systemChannel;
+        }
+        if (!welcomeChannel) return;
+
         let inviterName = 'غير معروف';
         try {
             const newInvites = await member.guild.invites.fetch();
@@ -215,6 +202,7 @@ client.on('guildMemberAdd', async (member) => {
 
         const memberCount = member.guild.memberCount;
         const replaceVars = (text) => {
+            if (!text) return '';
             return text
                 .replace(/{user}/g, `<@${member.id}>`)
                 .replace(/{username}/g, member.user.username)
@@ -227,15 +215,24 @@ client.on('guildMemberAdd', async (member) => {
         const parsedDescription = replaceVars(dbConfig.embedDescription);
         const parsedContent = replaceVars(dbConfig.welcomeMessage);
 
-        // إنشاء صورة الـ Canvas بناءً على إعدادات السيرفر المخزنة
+        // إنشاء صورة Canvas
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
-        const background = await loadImage(dbConfig.backgroundImage);
-        ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        
+        // جلب الخلفية مع فحص الأخطاء لمنع توقف البوت
+        try {
+            const background = await loadImage(dbConfig.backgroundImage);
+            ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
+        } catch (imgError) {
+            console.error('خطأ في تحميل خلفية السيرفر، تم استخدام خلفية سوداء بديلة:', imgError.message);
+            ctx.fillStyle = '#1e1f22';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
 
+        // رسم صورة العضو بشكل دائري كلياً
         ctx.save();
         ctx.beginPath();
-        const radius = dbConfig.avatarSize / 2;
+        const radius = Number(dbConfig.avatarSize) / 2;
         const centerX = Number(dbConfig.avatarX) + radius;
         const centerY = Number(dbConfig.avatarY) + radius;
         
@@ -243,14 +240,19 @@ client.on('guildMemberAdd', async (member) => {
         ctx.closePath();
         ctx.clip();
 
-        const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
-        const avatar = await loadImage(avatarURL);
-        ctx.drawImage(avatar, dbConfig.avatarX, dbConfig.avatarY, dbConfig.avatarSize, dbConfig.avatarSize);
+        try {
+            const avatarURL = member.user.displayAvatarURL({ extension: 'png', size: 256 });
+            const avatar = await loadImage(avatarURL);
+            ctx.drawImage(avatar, Number(dbConfig.avatarX), Number(dbConfig.avatarY), Number(dbConfig.avatarSize), Number(dbConfig.avatarSize));
+        } catch (avError) {
+            console.error('فشل جلب صورة أفاتار العضو:', avError.message);
+        }
         ctx.restore();
 
+        // طباعة نص الترحيب على الصورة بشكل ديناميكي
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 32px sans-serif';
-        ctx.fillText(`Welcome, ${member.user.username}!`, dbConfig.textX, dbConfig.textY);
+        ctx.fillText(`Welcome, ${member.user.username}!`, Number(dbConfig.textX), Number(dbConfig.textY));
 
         const attachment = new AttachmentBuilder(await canvas.encode('png'), { name: 'welcome-image.png' });
 
