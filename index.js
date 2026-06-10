@@ -204,21 +204,38 @@ client.on('guildMemberAdd', async (member) => {
         } catch (err) {
             console.error('خطأ تتبع الدعوة:', err.message);
         }
+const memberCount = member.guild.memberCount;
 
-        const memberCount = member.guild.memberCount;
-        const replaceVars = (text) => {
-            if (!text) return '';
-            return text
-                .replace(/{user}/g, `<@${member.id}>`)
-                .replace(/{username}/g, member.user.username)
-                .replace(/{server}/g, member.guild.name)
-                .replace(/{members}/g, memberCount)
-                .replace(/{inviter}/g, inviterName); 
-        };
+// 1. تحديث دالة استبدال المتغيرات لدعم الشرح (Prompt)
+const replaceVars = (text) => {
+    if (!text) return '';
+    
+    // هنا نأخذ الشرح من قاعدة البيانات، وإذا كان فارغاً نضع وصفاً افتراضياً بالإنجليزية ليفهمه الذكاء الاصطناعي
+    const imagePrompt = dbConfig.welcomeMessage ? encodeURIComponent(dbConfig.welcomeMessage) : 'cyberpunk+neon+welcome+background';
 
+    return text
+        .replace(/{user}/g, `<@${member.id}>`)
+        .replace(/{username}/g, member.user.username)
+        .replace(/{server}/g, member.guild.name)
+        .replace(/{members}/g, memberCount)
+        .replace(/{inviter}/g, inviterName)
+        .replace(/{prompt}/g, imagePrompt); // استبدال الكلمة المفتاحية بالوصف المشفر للرابط
+};
+
+        // 1. معالجة المتغيرات النصية العادية
         const parsedTitle = replaceVars(dbConfig.embedTitle);
         const parsedDescription = replaceVars(dbConfig.embedDescription);
         const parsedContent = replaceVars(dbConfig.welcomeMessage);
+
+        // 2. توليد رقم عشوائي بالكامل للـ Seed لمنع ثبات الصورة
+        const randomSeed = Math.floor(Math.random() * 999999) + 1;
+
+        // 3. تنظيف الشرح (Prompt) وتجهيزه ليكون متوافقاً مع روابط الويب
+        // نأخذ الشرح المكتوب من المتغير backgroundImage الموجود بقاعدة البيانات
+        const cleanPrompt = dbConfig.backgroundImage ? encodeURIComponent(dbConfig.backgroundImage) : 'welcome+background+neon';
+
+        // 4. بناء الرابط الديناميكي بالكامل باستخدام الشرح والـ seed العشوائي الجديد
+        const finalBackgroundImageUrl = `https://pollinations.ai{cleanPrompt}?width=800&height=400&enhanced=true&seed=${randomSeed}`;
 
         // إنشاء صورة Canvas
         const canvas = createCanvas(800, 400);
@@ -226,13 +243,15 @@ client.on('guildMemberAdd', async (member) => {
         
         // جلب الخلفية مع فحص الأخطاء لمنع توقف البوت
         try {
-            const background = await loadImage(dbConfig.backgroundImage);
+            console.log(`⏳ جاري توليد صورة فريدة وجديدة من الرابط: ${finalBackgroundImageUrl}`);
+            const background = await loadImage(finalBackgroundImageUrl);
             ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
         } catch (imgError) {
             console.error('خطأ في تحميل خلفية السيرفر، تم استخدام خلفية سوداء بديلة:', imgError.message);
             ctx.fillStyle = '#1e1f22';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+
 
         // رسم صورة العضو بشكل دائري كلياً
         ctx.save();
