@@ -240,7 +240,7 @@ const replaceVars = (text) => {
         
         const cleanPrompt = encodeURIComponent(rawPrompt);
 
-        const finalBackgroundImageUrl = `https://image.pollinations.ai/prompt/${cleanPrompt}?width=800&height=400&seed=${randomSeed}`;
+        const finalBackgroundImageUrl = `https://pollinations.ai/p/${cleanPrompt}?width=800&height=400&seed=${randomSeed}`;
 
 
         // إنشاء صورة Canvas
