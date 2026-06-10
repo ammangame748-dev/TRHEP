@@ -43,7 +43,7 @@ app.use(session({
 // إعدادات الـ OAuth2 من ديسكورد
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://onrender.com';
+const REDIRECT_URI = 'https://trhep.onrender.com/callback';
 
 // صفحة الدخول الرئيسية
 app.get('/', (req, res) => {
