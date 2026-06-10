@@ -240,8 +240,8 @@ const replaceVars = (text) => {
         
         const cleanPrompt = encodeURIComponent(rawPrompt);
 
-        // 4. بناء الرابط الصحيح والمباشر لـ API التوليد تلقائياً
-        const finalBackgroundImageUrl = `https://pollinations.ai{cleanPrompt}?width=800&height=400&enhanced=true&seed=${randomSeed}`;
+        const finalBackgroundImageUrl =
+`https://image.pollinations.ai/prompt/${cleanPrompt}?width=800&height=400&seed=${randomSeed}`;
 
         // إنشاء صورة Canvas
         const canvas = createCanvas(800, 400);
