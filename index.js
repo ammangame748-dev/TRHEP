@@ -247,12 +247,15 @@ const replaceVars = (text) => {
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
         
-        // 5. جلب الخلفية الديناميكية
+              // جلب الخلفية وتحويلها إلى Buffer لتفادي مشكلة نوع الصورة
         try {
-            console.log(`⏳ جاري طلب التوليد من الرابط الصحيح: ${finalBackgroundImageUrl}`);
-            const background = await loadImage(finalBackgroundImageUrl);
+            console.log(`⏳ جاري طلب التوليد وتحويل الصورة: ${finalBackgroundImageUrl}`);
+            const imageResponse = await axios.get(finalBackgroundImageUrl, { responseType: 'arraybuffer' });
+            const imageBuffer = Buffer.from(imageResponse.data, 'binary');
+            const background = await loadImage(imageBuffer);
             ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
         } catch (imgError) {
+
             console.error('❌ فشل توليد الصورة بسبب:', imgError.message);
             ctx.fillStyle = '#1e1f22'; // خلفية بديلة في حال حدوث ضغط على موقع التوليد
             ctx.fillRect(0, 0, canvas.width, canvas.height);
