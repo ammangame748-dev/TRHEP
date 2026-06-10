@@ -50,8 +50,11 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
 });
 // مسار تسجيل الدخول (يُعيد توجيه المستخدم لموقع ديسكورد)
+
 app.get('/login', (req, res) => {
-    const discordLoginUrl = `https://discord.com{CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
+    const discordLoginUrl =
+        `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
+
     res.redirect(discordLoginUrl);
 });
 
