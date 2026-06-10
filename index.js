@@ -55,14 +55,15 @@ app.use(session({
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REDIRECT_URI = 'https://onrender.com';
+const REDIRECT_URI = 'https://trhep.onrender.com/callback';
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
 });
 
 app.get('/login', (req, res) => {
-    const discordLoginUrl = `https://discord.com{CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
+    const discordLoginUrl =
+`https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
     res.redirect(discordLoginUrl);
 });
 app.get('/callback', async (req, res) => {
@@ -71,7 +72,7 @@ app.get('/callback', async (req, res) => {
 
     try {
         // تصحيح الرابط إلى مسار الـ API المخصص للتوكن
-        const tokenResponse = await axios.post('https://discord.com', new URLSearchParams({
+        const tokenResponse = await axios.post('https://discord.com/api/oauth2/token', new URLSearchParams({
             client_id: CLIENT_ID,
             client_secret: CLIENT_SECRET,
             grant_type: 'authorization_code',
@@ -81,13 +82,17 @@ app.get('/callback', async (req, res) => {
 
         const accessToken = tokenResponse.data.access_token;
 
-        // تصحيح مسار جلب بيانات الحساب
-        const userResponse = await axios.get('https://discord.com', {
-            headers: { Authorization: `Bearer ${accessToken}` }
-        });
+const userResponse = await axios.get(
+    'https://discord.com/api/users/@me',
+    {
+        headers: {
+            Authorization: `Bearer ${accessToken}`
+        }
+    }
+);
 
         // تصحيح مسار جلب السيرفرات
-        const guildsResponse = await axios.get('https://discord.com/guilds', {
+        const guildsResponse = await axios.get('https://discord.com/api/users/@me/guilds',{
             headers: { Authorization: `Bearer ${accessToken}` }
         });
 
