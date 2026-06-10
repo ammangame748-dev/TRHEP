@@ -222,35 +222,42 @@ const replaceVars = (text) => {
         .replace(/{prompt}/g, imagePrompt); // استبدال الكلمة المفتاحية بالوصف المشفر للرابط
 };
 
-        // 1. معالجة المتغيرات النصية العادية
+          // 1. معالجة المتغيرات النصية العادية للـ Embed
         const parsedTitle = replaceVars(dbConfig.embedTitle);
         const parsedDescription = replaceVars(dbConfig.embedDescription);
         const parsedContent = replaceVars(dbConfig.welcomeMessage);
 
-        // 2. توليد رقم عشوائي بالكامل للـ Seed لمنع ثبات الصورة
+        // 2. توليد رقم عشوائي فريد لكل عضو يدخل السيرفر
         const randomSeed = Math.floor(Math.random() * 999999) + 1;
 
-        // 3. تنظيف الشرح (Prompt) وتجهيزه ليكون متوافقاً مع روابط الويب
-        // نأخذ الشرح المكتوب من المتغير backgroundImage الموجود بقاعدة البيانات
-        const cleanPrompt = dbConfig.backgroundImage ? encodeURIComponent(dbConfig.backgroundImage) : 'welcome+background+neon';
+        // 3. تنظيف الشرح وجلبه بأمان
+        let rawPrompt = dbConfig.backgroundImage || 'futuristic+gaming+neon+background';
+        
+        // إذا كانت الخانة تحتوي على رابط قديم مشوه، نقوم بتنظيفها وأخذ الكلمات المفتاحية المفيدة فقط
+        if (rawPrompt.includes('http')) {
+            rawPrompt = 'futuristic+gaming+neon+background'; 
+        }
+        
+        const cleanPrompt = encodeURIComponent(rawPrompt);
 
-        // 4. بناء الرابط الديناميكي بالكامل باستخدام الشرح والـ seed العشوائي الجديد
+        // 4. بناء الرابط الصحيح والمباشر لـ API التوليد تلقائياً
         const finalBackgroundImageUrl = `https://pollinations.ai{cleanPrompt}?width=800&height=400&enhanced=true&seed=${randomSeed}`;
 
         // إنشاء صورة Canvas
         const canvas = createCanvas(800, 400);
         const ctx = canvas.getContext('2d');
         
-        // جلب الخلفية مع فحص الأخطاء لمنع توقف البوت
+        // 5. جلب الخلفية الديناميكية
         try {
-            console.log(`⏳ جاري توليد صورة فريدة وجديدة من الرابط: ${finalBackgroundImageUrl}`);
+            console.log(`⏳ جاري طلب التوليد من الرابط الصحيح: ${finalBackgroundImageUrl}`);
             const background = await loadImage(finalBackgroundImageUrl);
             ctx.drawImage(background, 0, 0, canvas.width, canvas.height);
         } catch (imgError) {
-            console.error('خطأ في تحميل خلفية السيرفر، تم استخدام خلفية سوداء بديلة:', imgError.message);
-            ctx.fillStyle = '#1e1f22';
+            console.error('❌ فشل توليد الصورة بسبب:', imgError.message);
+            ctx.fillStyle = '#1e1f22'; // خلفية بديلة في حال حدوث ضغط على موقع التوليد
             ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
+
 
 
         // رسم صورة العضو بشكل دائري كلياً
