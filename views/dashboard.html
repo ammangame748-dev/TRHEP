@@ -3,389 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>لوحة تحكم بوت الترحيب الخارق المطور 🚀</title>
+    <title>لوحة تحكم الكلانات</title>
     <style>
-        :root {
-            --bg-dark: #0f111a;
-            --card-dark: #161925;
-            --accent-neon: #7289da;
-            --text-main: #f0f1f5;
-            --text-muted: #a0a5b5;
-            --border-color: #24293e;
-            --success-neon: #00ff87;
-        }
-
         body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
             margin: 0;
             padding: 20px;
         }
-
         .container {
-            max-width: 1100px;
+            max-width: 1200px;
             margin: 0 auto;
         }
-
-        header {
+        h1 {
             text-align: center;
-            margin-bottom: 40px;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            color: #ffffff;
+            margin-bottom: 30px;
+            font-size: 28px;
+            border-bottom: 2px solid #292929;
+            padding-bottom: 15px;
         }
-
-        header h1 {
-            color: var(--accent-neon);
-            font-size: 2rem;
-            margin: 0;
-            text-shadow: 0 0 10px rgba(114, 137, 218, 0.3);
-        }
-
-        #loginScreen {
-            max-width: 450px;
-            margin: 150px auto;
-            text-align: center;
-        }
-
-        .btn-discord {
-            background-color: #5865F2;
-            color: white;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            text-decoration: none;
-            padding: 16px 32px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            border-radius: 8px;
-            transition: background 0.3s, transform 0.2s;
-            box-shadow: 0 4px 15px rgba(88, 101, 242, 0.4);
-        }
-
-        .btn-discord:hover {
-            background-color: #4752C4;
-            transform: translateY(-2px);
-        }
-
-        #mainDashboard {
-            display: none;
-        }
-
-        .user-badge {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background-color: var(--card-dark);
-            padding: 8px 16px;
-            border-radius: 20px;
-            border: 1px solid var(--border-color);
-        }
-
-        .user-badge img {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-        }
-
         .grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 25px;
         }
-
-        @media (max-width: 768px) {
-            .grid { grid-template-columns: 1fr; }
-        }
-
         .card {
-            background-color: var(--card-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 25px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            background-color: #1e1e1e;
+            border: 1px solid #2d2d2d;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
-
-        .card h2 {
+        .card h3 {
             margin-top: 0;
-            margin-bottom: 20px;
-            font-size: 1.4rem;
-            color: var(--accent-neon);
-            border-bottom: 1px solid var(--border-color);
+            color: #38bdf8;
+            border-bottom: 1px solid #2d2d2d;
             padding-bottom: 10px;
+            font-size: 20px;
         }
-
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
-
-        label {
+        .form-group label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--text-main);
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #aaaaaa;
         }
-
-        input[type="text"], input[type="number"], textarea, select {
+        .form-group input, .form-group textarea {
             width: 100%;
-            padding: 12px;
-            background-color: var(--bg-dark);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-main);
-            box-sizing: border-box;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: var(--accent-neon);
-            box-shadow: 0 0 8px rgba(114, 137, 218, 0.4);
-        }
-
-        .variables-hint {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 5px;
-            background: #1c2030;
-            padding: 5px 10px;
+            padding: 8px 12px;
+            background-color: #2b2b2b;
+            border: 1px solid #3d3d3d;
             border-radius: 4px;
-            display: inline-block;
+            color: #ffffff;
+            font-size: 14px;
+            box-sizing: border-box;
         }
-
-        .btn {
-            background-color: var(--accent-neon);
-            color: white;
-            border: none;
-            padding: 14px 28px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            width: 100%;
-            transition: background 0.3s ease;
+        .form-group input:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #38bdf8;
         }
-
-        .btn:hover {
-            background-color: #5b73c7;
-            box-shadow: 0 0 15px rgba(114, 137, 218, 0.4);
-        }
-
-        .btn-ai {
-            background: linear-gradient(45deg, #8a2387, #e94057, #f27121);
-            margin-top: 10px;
-        }
-
-        .range-inputs {
+        .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            gap: 10px;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 10px;
+            background-color: #0284c7;
+            color: #ffffff;
+            border: none;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-submit:hover {
+            background-color: #0369a1;
         }
     </style>
 </head>
 <body>
-<div class="container">
-    
-    <!-- شاشة تسجيل الدخول عبر الديسكورد الرسمي -->
-    <div id="loginScreen" class="card">
-        <h2 style="text-align:center; font-size: 1.8rem; margin-bottom: 30px;">🔑 لوحة التحكم العامة للبوت</h2>
-        <p style="color: var(--text-muted); margin-bottom: 30px;">سجل دخولك لتتمكن من فحص سيرفراتك وتعديل إعدادات الترحيب والذكاء الاصطناعي بشكل آمن.</p>
-        <a href="/login" class="btn-discord">
-            <svg width="24" height="24" viewBox="0 0 127.14 96.36" fill="white"><path d="M107.7,8.07A105.15,105.15,0,0,0,77.26,0a77.19,77.19,0,0,0-3.3,6.83A96.67,96.67,0,0,0,53.18,6.83,77.19,77.19,0,0,0,49.88,0,105.15,105.15,0,0,0,19.44,8.07C3.66,31.58-1.86,54.65,1,77.53A105.73,105.73,0,0,0,32,96.36a74.37,74.37,0,0,0,6.72-11A68.6,68.6,0,0,1,28.27,80.1q1.1-.81,2.15-1.67a75.7,75.7,0,0,0,93.44,0q1,.87,2.15,1.67a68.52,68.52,0,0,1-10.46,5.27,74.22,74.22,0,0,0,6.72,11,105.73,105.73,0,0,0,31-18.83C129.93,50.55,124.16,27.67,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53S36.18,40.36,42.45,40.36,53.83,46,53.83,53,48.72,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.24,60,73.24,53S78.41,40.36,84.69,40.36,96.07,46,96.07,53,91,65.69,84.69,65.69Z"/></svg>
-            تسجيل الدخول عبر ديسكورد
-        </a>
-    </div>
-
-    <!-- لوحة التحكم الكاملة بعد التحقق -->
-    <div id="mainDashboard">
-        <header>
-            <h1>لوحة تحكم بوت الترحيب 🚀</h1>
-            <div class="user-badge" id="userBadge">
-                <img id="userAvatar" src="" alt="Avatar">
-                <span id="usernameText"></span>
-            </div>
-        </header>
-
-        <div class="form-group" style="max-width: 400px; margin-bottom: 30px;">
-            <label style="font-size: 1.2rem; color: var(--accent-neon)">🌐 اختر السيرفر المراد تعديله:</label>
-            <select id="guildSelect" onchange="loadGuildConfig(this.value)">
-                <option value="">-- اختر سيرفر متواجد فيه البوت --</option>
-            </select>
+    <div class="container">
+        <h1>إدارة إعدادات الكلانات الثمانية</h1>
+        <div id="clans-grid" class="grid">
+            <!-- سيتم توليد البطاقات الـ 8 هنا تلقائيا بواسطة السكريبت -->
         </div>
-
-        <form id="configForm" style="display: none;">
-            <div class="grid">
-                <!-- اليمين -->
-                <div class="card">
-                    <h2>📝 إعدادات الرسائل والروم</h2>
-                    
-                    <div class="form-group">
-                        <label>📌 اختر روم الترحيب الخاصة بهذا السيرفر:</label>
-                        <select id="welcomeChannelId" name="welcomeChannelId">
-                            <option value="">-- فحص تلقائي باسم الروم --</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>رسالة المنشن الخارجية:</label>
-                        <input type="text" id="welcomeMessage" name="welcomeMessage">
-                        <div class="variables-hint">المتغيرات المدعومة: {user} , {server} , {members} , {inviter}</div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>عنوان الإمبيد (Embed Title):</label>
-                        <input type="text" id="embedTitle" name="embedTitle">
-                    </div>
-
-                    <div class="form-group">
-                        <label>وصف الإمبيد (Embed Description):</label>
-                        <textarea id="embedDescription" name="embedDescription" rows="4"></textarea>
-                    </div>
-                </div>
-
-                <!-- اليسار -->
-                <div class="card">
-                    <h2>🎨 محرك الصور والذكاء الاصطناعي</h2>
-
-                    <div class="form-group">
-                        <label>توليد خلفية بالذكاء الاصطناعي للسيرفر (بالإنجليزي):</label>
-                        <input type="text" id="aiPrompt" placeholder="e.g., dark cyber purple background for discord welcome">
-                        <button type="button" class="btn btn-ai" id="generateAI">توليد الخلفية فوراً 🪄</button>
-                    </div>
-
-                    <div class="form-group">
-                        <label>رابط الصورة المعتمد حالياً:</label>
-                        <input type="text" id="backgroundImage" name="backgroundImage">
-                    </div>
-
-                    <h2>📍 إحداثيات الصورة والنصوص (Canvas)</h2>
-                    <div class="range-inputs">
-                        <div class="form-group">
-                            <label>صورة العضو X (أفقي):</label>
-                            <input type="number" id="avatarX" name="avatarX">
-                        </div>
-                        <div class="form-group">
-                            <label>صورة العضو Y (عمودي):</label>
-                            <input type="number" id="avatarY" name="avatarY">
-                        </div>
-                    </div>
-
-                    <div class="range-inputs">
-                        <div class="form-group">
-                            <label>حجم الدائرة:</label>
-                            <input type="number" id="avatarSize" name="avatarSize">
-                        </div>
-                        <div class="form-group">
-                            <label>نص الترحيب X:</label>
-                            <input type="number" id="textX" name="textX">
-                        </div>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>نص الترحيب Y:</label>
-                        <input type="number" id="textY" name="textY">
-                    </div>
-
-                    <button type="submit" class="btn">حفظ وتطبيق إعدادات هذا السيرفر 💾</button>
-                </div>
-            </div>
-        </form>
     </div>
-</div>
-<script>
-    let currentGuildId = "";
+    <script>
+        // دالة لجلب بيانات الكلانات الثمانية من السيرفر وعرضها داخل الصفحة
+        async function loadClans() {
+            try {
+                const response = await fetch('/api/clans');
+                const clans = await response.json();
+                const grid = document.getElementById('clans-grid');
+                grid.innerHTML = ''; // تفريغ المحتوى القديم
 
-    async function checkAuth() {
-        try {
-            const res = await fetch('/api/user-data');
-            if (res.status === 200) {
-                const data = await res.json();
-                
-                document.getElementById('loginScreen').style.display = 'none';
-                document.getElementById('mainDashboard').style.display = 'block';
-                
-                document.getElementById('usernameText').innerText = `${data.user.username}`;
-                if(data.user.avatar) {
-                    document.getElementById('userAvatar').src = `https://discordapp.com{data.user.id}/${data.user.avatar}.png`;
-                } else {
-                    document.getElementById('userAvatar').src = `https://discordapp.com`;
-                }
+                clans.forEach(clan => {
+                    // تفكيك الأسئلة الثلاثة المخزنة في قاعدة البيانات
+                    const q1 = clan.questions && clan.questions[0] ? clan.questions[0] : '';
+                    const q2 = clan.questions && clan.questions[1] ? clan.questions[1] : '';
+                    const q3 = clan.questions && clan.questions[2] ? clan.questions[2] : '';
 
-                const select = document.getElementById('guildSelect');
-                data.guilds.forEach(g => {
-                    const opt = document.createElement('option');
-                    opt.value = g.id;
-                    opt.innerText = g.name;
-                    select.appendChild(opt);
+                    // بناء بطاقة الكلان بالكامل مع الحقول المطلوبة
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <form action="/api/clans/update" method="POST">
+                            <input type="hidden" name="clanIndex" value="${clan.clanIndex}">
+                            <h3>الكلان رقم ${clan.clanIndex}</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>اسم الكلان</label>
+                                    <input type="text" name="clanName" value="${clan.clanName || ''}" placeholder="أدخل اسم الكلان">
+                                </div>
+                                <div class="form-group">
+                                    <label>اسم النقاط المخصص</label>
+                                    <input type="text" name="pointsName" value="${clan.pointsName || 'نقاط'}" placeholder="مثال: ذهب، نقاط">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>معرف (ID) قائد الكلان</label>
+                                    <input type="text" name="leaderId" value="${clan.leaderId || ''}" placeholder="ID القائد">
+                                </div>
+                                <div class="form-group">
+                                    <label>معرف (ID) رتبة الكلان</label>
+                                    <input type="text" name="roleId" value="${clan.roleId || ''}" placeholder="ID الرتبة">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>روم الكتابة المخصص</label>
+                                    <input type="text" name="textChannelId" value="${clan.textChannelId || ''}" placeholder="ID روم الكتابة">
+                                </div>
+                                <div class="form-group">
+                                    <label>روم الصوت المخصص</label>
+                                    <input type="text" name="voiceChannelId" value="${clan.voiceChannelId || ''}" placeholder="ID روم الصوت">
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>قناة تقديم الكلان</label>
+                                    <input type="text" name="applyChannelId" value="${clan.applyChannelId || ''}" placeholder="ID قناة التقديم">
+                                </div>
+                                <div class="form-group">
+                                    <label>قناة المقابلات</label>
+                                    <input type="text" name="interviewChannelId" value="${clan.interviewChannelId || ''}" placeholder="ID قناة المقابلة">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>قناة نتائج القبول والرفض</label>
+                                <input type="text" name="resultsChannelId" value="${clan.resultsChannelId || ''}" placeholder="ID قناة النتائج">
+                            </div>
+
+                            <div class="form-group">
+                                <label>محتوى إمبد التقديم</label>
+                                <textarea name="applyContent" rows="2" placeholder="اكتب هنا النص الذي يظهر في رسالة التقديم">${clan.applyContent || ''}</textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label>أسئلة التقديم الثلاثة</label>
+                                <input type="text" name="q1" value="${q1}" placeholder="السؤال الأول" style="margin-bottom: 5px;">
+                                <input type="text" name="q2" value="${q2}" placeholder="السؤال الثاني" style="margin-bottom: 5px;">
+                                <input type="text" name="q3" value="${q3}" placeholder="السؤال الثالث">
+                            </div>
+
+                            <button type="submit" class="btn-submit">حفظ التعديلات وارسال الإمبد</button>
+                        </form>
+                    `;
+                    grid.appendChild(card);
                 });
+            } catch (error) {
+                console.error('خطأ أثناء جلب بيانات لوحة التحكم:', error);
             }
-        } catch (err) {
-            console.log("غير مسجل دخول حالياً.");
-        }
-    }
-
-    async function loadGuildConfig(guildId) {
-        if (!guildId) {
-            document.getElementById('configForm').style.display = 'none';
-            return;
-        }
-        currentGuildId = guildId;
-
-        const res = await fetch(`/api/guild-config/${guildId}`);
-        const data = await res.json();
-
-        if (data.error) return alert(data.error);
-
-        const chanSelect = document.getElementById('welcomeChannelId');
-        chanSelect.innerHTML = '<option value="">-- فحص تلقائي باسم الروم --</option>';
-        data.channels.forEach(ch => {
-            const opt = document.createElement('option');
-            opt.value = ch.id;
-            opt.innerText = `# ${ch.name}`;
-            chanSelect.appendChild(opt);
-        });
-
-        for (const key in data.config) {
-            const input = document.getElementById(key);
-            if (input) input.value = data.config[key];
         }
 
-        document.getElementById('configForm').style.display = 'block';
-    }
-
-    document.getElementById('configForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData.entries());
-
-        const res = await fetch(`/api/guild-config/${currentGuildId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-
-        const result = await res.json();
-        alert(result.message);
-    });
-
-    document.getElementById('generateAI').addEventListener('click', function() {
-        const prompt = document.getElementById('aiPrompt').value;
-        if (!prompt) return alert('الرجاء كتابة وصف للصورة أولاً!');
-        this.innerText = 'جاري التوليد... ⏳';
-        const cleanPrompt = encodeURIComponent(prompt);
-        const aiUrl = `https://pollinations.ai{cleanPrompt}?width=800&height=400&enhanced=true&seed=${Math.floor(Math.random() * 100000)}`;
-        document.getElementById('backgroundImage').value = aiUrl;
-        this.innerText = 'تم التوليد بنجاح! 🎉';
-        alert('تم توليد خلفية الذكاء الاصطناعي وتجهيزها بنجاح!');
-    });
-
-    checkAuth();
-</script>
-
+        // تشغيل الدالة فور تحميل الصفحة بالكامل
+        window.onload = loadClans;
+    </script>
 </body>
 </html>
