@@ -111,8 +111,7 @@
             <!-- سيتم توليد البطاقات الـ 8 هنا تلقائيا بواسطة السكريبت -->
         </div>
     </div>
-    <script>
-        // دالة لجلب بيانات الكلانات الثمانية من السيرفر وعرضها داخل الصفحة
+       <script>
         // دالة لجلب بيانات الكلانات الثمانية بناءً على السيرفر المفتوح حالياً بالرابط
         async function loadClans() {
             try {
@@ -123,9 +122,10 @@
                 const response = await fetch('/api/clans/' + guildId);
                 const clans = await response.json();
                 const grid = document.getElementById('clans-grid');
-                grid.innerHTML = '';
+                grid.innerHTML = ''; 
 
                 clans.forEach(clan => {
+                    // تصحيح فحص وقراءة الأسئلة الثلاثة من قاعدة البيانات لمنع حدوث التوقف
                     const q1 = clan.questions && clan.questions[0] ? clan.questions[0] : '';
                     const q2 = clan.questions && clan.questions[1] ? clan.questions[1] : '';
                     const q3 = clan.questions && clan.questions[2] ? clan.questions[2] : '';
@@ -133,44 +133,44 @@
                     const card = document.createElement('div');
                     card.className = 'card';
                     card.innerHTML = `
-                <form action="/api/clans/update" method="POST">
-                    <!-- حقل مخفي لإرسال آيدي السيرفر والكلان الحالي -->
-                    <input type="hidden" name="guildId" value="${guildId}">
-                    <input type="hidden" name="clanIndex" value="${clan.clanIndex}">
-                    <h3>الكلان رقم ${clan.clanIndex}</h3>
-                    
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>اسم الكلان</label>
-                            <input type="text" name="clanName" value="${clan.clanName || ''}" placeholder="أدخل اسم الكلان">
-                        </div>
-                        <div class="form-group">
-                            <label>اسم النقاط المخصص</label>
-                            <input type="text" name="pointsName" value="${clan.pointsName || 'نقاط'}" placeholder="مثال: ذهب، نقاط">
-                        </div>
-                    </div>
+                        <form action="/api/clans/update" method="POST">
+                            <!-- حقل مخفي لإرسال آيدي السيرفر والكلان الحالي -->
+                            <input type="hidden" name="guildId" value="${guildId}">
+                            <input type="hidden" name="clanIndex" value="${clan.clanIndex}">
+                            <h3>الكلان رقم ${clan.clanIndex}</h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>اسم الكلان</label>
+                                    <input type="text" name="clanName" value="${clan.clanName || ''}" placeholder="أدخل اسم الكلان">
+                                </div>
+                                <div class="form-group">
+                                    <label>اسم النقاط المخصص</label>
+                                    <input type="text" name="pointsName" value="${clan.pointsName || 'نقاط'}" placeholder="مثال: ذهب، نقاط">
+                                </div>
+                            </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>معرف (ID) قائد الكلان</label>
-                            <input type="text" name="leaderId" value="${clan.leaderId || ''}" placeholder="ID القائد">
-                        </div>
-                        <div class="form-group">
-                            <label>معرف (ID) رتبة الكلان</label>
-                            <input type="text" name="roleId" value="${clan.roleId || ''}" placeholder="ID الرتبة">
-                        </div>
-                    </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>معرف (ID) قائد الكلان</label>
+                                    <input type="text" name="leaderId" value="${clan.leaderId || ''}" placeholder="ID القائد">
+                                </div>
+                                <div class="form-group">
+                                    <label>معرف (ID) رتبة الكلان</label>
+                                    <input type="text" name="roleId" value="${clan.roleId || ''}" placeholder="ID الرتبة">
+                                </div>
+                            </div>
 
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>روم الكتابة المخصص</label>
-                            <input type="text" name="textChannelId" value="${clan.textChannelId || ''}" placeholder="ID روم الكتابة">
-                        </div>
-                        <div class="form-group">
-                            <label>روم الصوت المخصص</label>
-                            <input type="text" name="voiceChannelId" value="${clan.voiceChannelId || ''}" placeholder="ID روم الصوت">
-                        </div>
-                    </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>روم الكتابة المخصص</label>
+                                    <input type="text" name="textChannelId" value="${clan.textChannelId || ''}" placeholder="ID روم الكتابة">
+                                </div>
+                                <div class="form-group">
+                                    <label>روم الصوت المخصص</label>
+                                    <input type="text" name="voiceChannelId" value="${clan.voiceChannelId || ''}" placeholder="ID روم الصوت">
+                                </div>
+                            </div>
 
                     <div class="form-row">
                         <div class="form-group">
@@ -203,16 +203,16 @@
                     <button type="submit" class="btn-submit">حفظ التعديلات وارسال الإمبد</button>
                 </form>
             `;
-                    grid.appendChild(card);
-                });
-            } catch (error) {
-                console.error('خطأ أثناء جلب بيانات لوحة التحكم:', error);
-            }
-        }
+            grid.appendChild(card);
+        });
+    } catch (error) {
+        console.error('خطأ أثناء جلب بيانات لوحة التحكم:', error);
+    }
+}
 
-        window.onload = loadClans;
+window.onload = loadClans;
+</script>
 
-    </script>
 </body>
 
 </html>
