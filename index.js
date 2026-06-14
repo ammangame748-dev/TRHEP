@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const express = require('express');
 const session = require('express-session');
 const passport = require('passport');
@@ -144,7 +144,7 @@ async function updateApplyEmbed(guildId, clanIndex) {
         .setColor(0x0099ff);
 
     const button = new ButtonBuilder()
-        .setCustomId(`apply_btn_${guildId}_${clanIndex}`)
+        .setCustomId(`applybtn_${guildId}_${clanIndex}`)
         .setLabel('تقديم طلب انضمام')
         .setStyle(ButtonStyle.Primary);
 
@@ -161,28 +161,72 @@ async function updateApplyEmbed(guildId, clanIndex) {
     }
 }
 // =============================================================
-// الجزء الثاني - القسم (أ): أحداث التفاعل ونظام المقابلات
+// الجزء الثاني: أحداث التفاعل ونظام المقابلات والـ Modals
 // =============================================================
 
 client.on('interactionCreate', async interaction => {
+    // معالجة النوافذ المنبثقة (Modals) لقائد الكلان أولاً
+    if (interaction.isModalSubmit() && interaction.customId.startsWith('clan_modal_')) {
+        const parts = interaction.customId.replace('clan_modal_', '').split('_');
+        const action = parts[0];
+        const clanIndex = parseInt(parts[1]);
+        const guildId = interaction.guild.id;
+
+        const clan = await Clan.findOne({ guildId, clanIndex });
+        if (!clan) return interaction.reply({ content: 'حدث خطأ في جلب بيانات الكلان من قاعدة البيانات.', ephemeral: true });
+
+        await interaction.deferReply({ ephemeral: true });
+
+        const targetId = interaction.fields.getTextInputValue('target_user_id').trim();
+        const member = await interaction.guild.members.fetch(targetId).catch(() => null);
+        const responseEmbed = new EmbedBuilder().setColor(0x0099ff);
+
+        if (action === 'add_member') {
+            if (!member) {
+                responseEmbed.setTitle('خطأ في العملية').setDescription('لم يتم العثور على العضو في هذا السيرفر، يرجى التحقق من الـ ID.').setColor(0xff0000);
+                return interaction.editReply({ embeds: [responseEmbed] });
+            }
+            if (clan.roleId) await member.roles.add(clan.roleId).catch(() => {});
+            responseEmbed.setTitle('تحديث الرتب والأعضاء').setDescription(`تم إضافة العضو <@${targetId}> بنجاح وتعيين رتبة الكلان له.`);
+            return interaction.editReply({ embeds: [responseEmbed] });
+        }
+
+        if (action === 'remove_member') {
+            if (!member) {
+                responseEmbed.setTitle('خطأ في العملية').setDescription('لم يتم العثور على العضو في هذا السيرفر، يرجى التحقق من الـ ID.').setColor(0xff0000);
+                return interaction.editReply({ embeds: [responseEmbed] });
+            }
+            if (clan.roleId) await member.roles.remove(clan.roleId).catch(() => {});
+            responseEmbed.setTitle('تحديث الرتب والأعضاء').setDescription(`تم طرد العضو <@${targetId}> وسحب رتبة الكلان منه بنجاح.`);
+            return interaction.editReply({ embeds: [responseEmbed] });
+        }
+
+        if (action === 'check_member') {
+            const currentPts = clan.membersPoints.get(targetId) || 0;
+            responseEmbed.setTitle('استعلام عن نقاط عضو')
+                .setDescription(`نقاط العضو <@${targetId}> الحالية داخل الكلان هي:\n\n\`${currentPts}\` \`${clan.pointsName}\``)
+                .setColor(0xffff00);
+            return interaction.editReply({ embeds: [responseEmbed] });
+        }
+    }
+
     if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
     // معالجة زر التقديم للكلان
-    if (interaction.isButton() && interaction.customId.startsWith('apply_btn_')) {
+    if (interaction.isButton() && interaction.customId.startsWith('applybtn_')) {
         const parts = interaction.customId.split('_');
-        const guildId = parts[2];
-        const clanIndex = parseInt(parts[3]);
+        const guildId = parts[1];
+        const clanIndex = parseInt(parts[2]);
 
         const clan = await Clan.findOne({ guildId, clanIndex });
         if (!clan) return interaction.reply({ content: 'حدث خطأ في جلب بيانات الكلان.', ephemeral: true });
 
         await interaction.deferReply({ ephemeral: true });
 
-        // إنشاء خيط محادثة خاص (Private Thread)
         const thread = await interaction.channel.threads.create({
             name: `تقديم ${interaction.user.username}`,
             autoArchiveDuration: 60,
-            type: ChannelType.PrivateThread,
+            type: 12, // Private Thread
             reason: 'طلب تقديم كلان جديد'
         }).catch(() => null);
 
@@ -198,7 +242,6 @@ client.on('interactionCreate', async interaction => {
             await thread.send({ content: `**السؤال ${i + 1}:** ${questions[i]}` });
             const filter = m => m.author.id === interaction.user.id;
 
-            // استقبال الإجابة من داخل الثريد نفسه
             const collected = await thread.awaitMessages({ filter, max: 1, time: 120000, errors: ['time'] }).catch(() => null);
 
             if (!collected) {
@@ -211,7 +254,6 @@ client.on('interactionCreate', async interaction => {
         await thread.send({ content: `تم استلام إجاباتك بنجاح، سيتم مراجعتها من قبل قائد الكلان وقفل هذا القسم تلقائياً.` });
         setTimeout(() => thread.delete().catch(() => { }), 5000);
 
-        // إرسال الطلب لقناة النتائج والقبول المحددة
         const resultsChannel = client.channels.cache.get(clan.resultsChannelId);
         if (resultsChannel) {
             const resultEmbed = new EmbedBuilder()
@@ -230,7 +272,6 @@ client.on('interactionCreate', async interaction => {
             await resultsChannel.send({ embeds: [resultEmbed], components: [row] });
         }
     }
-
     // معالجة أزرار القبول والرفض من قائد الكلان
     if (interaction.isButton() && (interaction.customId.startsWith('accept_') || interaction.customId.startsWith('reject_'))) {
         const parts = interaction.customId.split('_');
@@ -258,56 +299,61 @@ client.on('interactionCreate', async interaction => {
         }
         await interaction.message.delete().catch(() => { });
     }
-    // معالجة منيو قائمة التحكم الخاصة بالقائد
-    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('leader_menu_')) {
-        const parts = interaction.customId.split('_');
-        const guildId = parts[2];
-        const clanIndex = parseInt(parts[3]);
 
+    // معالجة منيو قائمة التحكم الخاصة بالقائد وتحويلها إلى Modals و Embeds
+    if (interaction.isStringSelectMenu() && interaction.customId.startsWith('leader_menu_')) {
+        const parts = interaction.customId.replace('leader_menu_', '').split('_');
+        const guildId = parts[0];
+        const clanIndex = parseInt(parts[1]);
         const clan = await Clan.findOne({ guildId, clanIndex });
+        
         if (!clan || interaction.user.id !== clan.leaderId) {
             return interaction.reply({ content: 'غير مسموح لك باستخدام هذه القائمة.', ephemeral: true });
         }
 
         const selection = interaction.values[0];
-        await interaction.deferReply({ ephemeral: true });
 
         if (selection === 'info') {
-            return interaction.editReply({ content: `معلومات الكلان:\nالاسم: ${clan.clanName}\nالنقاط الإجمالية: ${clan.totalPoints} ${clan.pointsName}` });
+            const infoEmbed = new EmbedBuilder()
+                .setTitle(`معلومات الكلان: ${clan.clanName}`)
+                .setColor(0x0099ff)
+                .addFields(
+                    { name: 'اسم الكلان', value: `${clan.clanName || 'غير محدد'}`, inline: true },
+                    { name: 'النقاط الإجمالية للكلان', value: `\`${clan.totalPoints}\` \`${clan.pointsName}\``, inline: true }
+                );
+            return interaction.reply({ embeds: [infoEmbed], ephemeral: true });
         }
 
         if (selection === 'total_points') {
-            return interaction.editReply({ content: `نقاط الكلان الكاملة المتراكمة: ${clan.totalPoints} ${clan.pointsName}` });
+            const pointsEmbed = new EmbedBuilder()
+                .setTitle(`إجمالي نقاط كلان: ${clan.clanName}`)
+                .setDescription(`نقاط الكلان الكاملة المتراكمة حالياً هي: \`${clan.totalPoints}\` \`${clan.pointsName}\``)
+                .setColor(0x00ff00);
+            return interaction.reply({ embeds: [pointsEmbed], ephemeral: true });
         }
 
-        if (selection === 'add_member' || selection === 'remove_member' || selection === 'check_member') {
-            await interaction.editReply({ content: 'من فضلك قم بكتابة الرقم التعريفي (ID) الخاص بالعضو في الشات الآن:' });
+        const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+        let modalTitle = '';
+        
+        if (selection === 'add_member') modalTitle = 'اضافة عضو للكلان';
+        if (selection === 'remove_member') modalTitle = 'طرد عضو من الكلان';
+        if (selection === 'check_member') modalTitle = 'استعلام عن نقاط عضو بالكلان';
 
-            const filter = m => m.author.id === interaction.user.id;
-            const collected = await interaction.channel.awaitMessages({ filter, max: 1, time: 30000 }).catch(() => null);
+        const modal = new ModalBuilder()
+            .setCustomId(`clan_modal_${selection}_${clanIndex}`)
+            .setTitle(modalTitle);
 
-            if (!collected) return interaction.followUp({ content: 'انتهى الوقت ولم يتم إدخال معرف العضو.', ephemeral: true });
+        const userIdInput = new TextInputBuilder()
+            .setCustomId('target_user_id')
+            .setLabel('أدخل الرقم التعريفي (ID) الخاص بالعضو')
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setPlaceholder('مثال: 123456789012345678');
 
-            const targetId = collected.first().content.trim();
-            await collected.first().delete().catch(() => { }); // حذف رسالة الـ ID للحفاظ على السرية
+        const row = new ActionRowBuilder().addComponents(userIdInput);
+        modal.addComponents(row);
 
-            const member = await interaction.guild.members.fetch(targetId).catch(() => null);
-
-            if (selection === 'add_member') {
-                if (!member) return interaction.followUp({ content: 'تعذر العثور على هذا العضو في السيرفر.', ephemeral: true });
-                if (clan.roleId) await member.roles.add(clan.roleId).catch(() => { });
-                return interaction.followUp({ content: `تم إضافة العضو بنجاح وتعيين رتبة الكلان له.`, ephemeral: true });
-            }
-            if (selection === 'remove_member') {
-                if (!member) return interaction.followUp({ content: 'تعذر العثور على هذا العضو في السيرفر.', ephemeral: true });
-                if (clan.roleId) await member.roles.remove(clan.roleId).catch(() => { });
-                return interaction.followUp({ content: `تم طرد العضو وسحب الرتبة منه بنجاح.`, ephemeral: true });
-            }
-            if (selection === 'check_member') {
-                const currentPts = clan.membersPoints.get(targetId) || 0;
-                return interaction.followUp({ content: `نقاط العضو الحالي هي: ${currentPts} ${clan.pointsName}`, ephemeral: true });
-            }
-        }
+        return await interaction.showModal(modal);
     }
 });
 
@@ -317,7 +363,6 @@ client.on('interactionCreate', async interaction => {
 client.on('messageCreate', async message => {
     if (message.author.bot || !message.guild) return;
 
-    // تفعيل أمر "تحكم" لقائد الكلان
     if (message.content === 'تحكم') {
         const clan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
         if (clan && message.author.id === clan.leaderId) {
@@ -337,7 +382,6 @@ client.on('messageCreate', async message => {
         }
     }
 
-    // احتساب نقاط تفاعل الشات
     const activeClan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
     if (activeClan) {
         let currentCount = activeClan.messageCounters.get(message.author.id) || 0;
@@ -369,7 +413,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
     const newClan = newState.channelId ? await Clan.findOne({ guildId, voiceChannelId: newState.channelId }) : null;
     const oldClan = oldState.channelId ? await Clan.findOne({ guildId, voiceChannelId: oldState.channelId }) : null;
 
-    // الدخول أو الانتقال لروم كلان مخصص
     if (newClan && (!oldClan || oldState.channelId !== newState.channelId)) {
         if (voiceTimers.has(memberId)) {
             clearInterval(voiceTimers.get(memberId));
@@ -392,7 +435,6 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         voiceTimers.set(memberId, timer);
     }
 
-    // الخروج من رومات الكلانات
     if (!newState.channelId || (!newClan && oldClan)) {
         if (voiceTimers.has(memberId)) {
             clearInterval(voiceTimers.get(memberId));
