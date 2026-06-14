@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,10 +13,12 @@
             margin: 0;
             padding: 20px;
         }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
         }
+
         h1 {
             text-align: center;
             color: #ffffff;
@@ -24,18 +27,21 @@
             border-bottom: 2px solid #292929;
             padding-bottom: 15px;
         }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 25px;
         }
+
         .card {
             background-color: #1e1e1e;
             border: 1px solid #2d2d2d;
             border-radius: 8px;
             padding: 20px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
         }
+
         .card h3 {
             margin-top: 0;
             color: #38bdf8;
@@ -43,16 +49,20 @@
             padding-bottom: 10px;
             font-size: 20px;
         }
+
         .form-group {
             margin-bottom: 15px;
         }
+
         .form-group label {
             display: block;
             margin-bottom: 5px;
             font-size: 14px;
             color: #aaaaaa;
         }
-        .form-group input, .form-group textarea {
+
+        .form-group input,
+        .form-group textarea {
             width: 100%;
             padding: 8px 12px;
             background-color: #2b2b2b;
@@ -62,15 +72,19 @@
             font-size: 14px;
             box-sizing: border-box;
         }
-        .form-group input:focus, .form-group textarea:focus {
+
+        .form-group input:focus,
+        .form-group textarea:focus {
             outline: none;
             border-color: #38bdf8;
         }
+
         .form-row {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px;
         }
+
         .btn-submit {
             width: 100%;
             padding: 10px;
@@ -83,11 +97,13 @@
             cursor: pointer;
             transition: background-color 0.2s;
         }
+
         .btn-submit:hover {
             background-color: #0369a1;
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <h1>إدارة إعدادات الكلانات الثمانية</h1>
@@ -97,91 +113,96 @@
     </div>
     <script>
         // دالة لجلب بيانات الكلانات الثمانية من السيرفر وعرضها داخل الصفحة
+        // دالة لجلب بيانات الكلانات الثمانية بناءً على السيرفر المفتوح حالياً بالرابط
         async function loadClans() {
             try {
-                const response = await fetch('/api/clans');
+                // استخراج الـ guildId من رابط المتصفح الحالي تلقائياً
+                const pathParts = window.location.pathname.split('/');
+                const guildId = pathParts[pathParts.length - 1];
+
+                const response = await fetch('/api/clans/' + guildId);
                 const clans = await response.json();
                 const grid = document.getElementById('clans-grid');
-                grid.innerHTML = ''; // تفريغ المحتوى القديم
+                grid.innerHTML = '';
 
                 clans.forEach(clan => {
-                    // تفكيك الأسئلة الثلاثة المخزنة في قاعدة البيانات
                     const q1 = clan.questions && clan.questions[0] ? clan.questions[0] : '';
                     const q2 = clan.questions && clan.questions[1] ? clan.questions[1] : '';
                     const q3 = clan.questions && clan.questions[2] ? clan.questions[2] : '';
 
-                    // بناء بطاقة الكلان بالكامل مع الحقول المطلوبة
                     const card = document.createElement('div');
                     card.className = 'card';
                     card.innerHTML = `
-                        <form action="/api/clans/update" method="POST">
-                            <input type="hidden" name="clanIndex" value="${clan.clanIndex}">
-                            <h3>الكلان رقم ${clan.clanIndex}</h3>
-                            
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>اسم الكلان</label>
-                                    <input type="text" name="clanName" value="${clan.clanName || ''}" placeholder="أدخل اسم الكلان">
-                                </div>
-                                <div class="form-group">
-                                    <label>اسم النقاط المخصص</label>
-                                    <input type="text" name="pointsName" value="${clan.pointsName || 'نقاط'}" placeholder="مثال: ذهب، نقاط">
-                                </div>
-                            </div>
+                <form action="/api/clans/update" method="POST">
+                    <!-- حقل مخفي لإرسال آيدي السيرفر والكلان الحالي -->
+                    <input type="hidden" name="guildId" value="${guildId}">
+                    <input type="hidden" name="clanIndex" value="${clan.clanIndex}">
+                    <h3>الكلان رقم ${clan.clanIndex}</h3>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>اسم الكلان</label>
+                            <input type="text" name="clanName" value="${clan.clanName || ''}" placeholder="أدخل اسم الكلان">
+                        </div>
+                        <div class="form-group">
+                            <label>اسم النقاط المخصص</label>
+                            <input type="text" name="pointsName" value="${clan.pointsName || 'نقاط'}" placeholder="مثال: ذهب، نقاط">
+                        </div>
+                    </div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>معرف (ID) قائد الكلان</label>
-                                    <input type="text" name="leaderId" value="${clan.leaderId || ''}" placeholder="ID القائد">
-                                </div>
-                                <div class="form-group">
-                                    <label>معرف (ID) رتبة الكلان</label>
-                                    <input type="text" name="roleId" value="${clan.roleId || ''}" placeholder="ID الرتبة">
-                                </div>
-                            </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>معرف (ID) قائد الكلان</label>
+                            <input type="text" name="leaderId" value="${clan.leaderId || ''}" placeholder="ID القائد">
+                        </div>
+                        <div class="form-group">
+                            <label>معرف (ID) رتبة الكلان</label>
+                            <input type="text" name="roleId" value="${clan.roleId || ''}" placeholder="ID الرتبة">
+                        </div>
+                    </div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>روم الكتابة المخصص</label>
-                                    <input type="text" name="textChannelId" value="${clan.textChannelId || ''}" placeholder="ID روم الكتابة">
-                                </div>
-                                <div class="form-group">
-                                    <label>روم الصوت المخصص</label>
-                                    <input type="text" name="voiceChannelId" value="${clan.voiceChannelId || ''}" placeholder="ID روم الصوت">
-                                </div>
-                            </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>روم الكتابة المخصص</label>
+                            <input type="text" name="textChannelId" value="${clan.textChannelId || ''}" placeholder="ID روم الكتابة">
+                        </div>
+                        <div class="form-group">
+                            <label>روم الصوت المخصص</label>
+                            <input type="text" name="voiceChannelId" value="${clan.voiceChannelId || ''}" placeholder="ID روم الصوت">
+                        </div>
+                    </div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>قناة تقديم الكلان</label>
-                                    <input type="text" name="applyChannelId" value="${clan.applyChannelId || ''}" placeholder="ID قناة التقديم">
-                                </div>
-                                <div class="form-group">
-                                    <label>قناة المقابلات</label>
-                                    <input type="text" name="interviewChannelId" value="${clan.interviewChannelId || ''}" placeholder="ID قناة المقابلة">
-                                </div>
-                            </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>قناة تقديم الكلان</label>
+                            <input type="text" name="applyChannelId" value="${clan.applyChannelId || ''}" placeholder="ID قناة التقديم">
+                        </div>
+                        <div class="form-group">
+                            <label>قناة المقابلات</label>
+                            <input type="text" name="interviewChannelId" value="${clan.interviewChannelId || ''}" placeholder="ID قناة المقابلة">
+                        </div>
+                    </div>
 
-                            <div class="form-group">
-                                <label>قناة نتائج القبول والرفض</label>
-                                <input type="text" name="resultsChannelId" value="${clan.resultsChannelId || ''}" placeholder="ID قناة النتائج">
-                            </div>
+                    <div class="form-group">
+                        <label>قناة نتائج القبول والرفض</label>
+                        <input type="text" name="resultsChannelId" value="${clan.resultsChannelId || ''}" placeholder="ID قناة النتائج">
+                    </div>
 
-                            <div class="form-group">
-                                <label>محتوى إمبد التقديم</label>
-                                <textarea name="applyContent" rows="2" placeholder="اكتب هنا النص الذي يظهر في رسالة التقديم">${clan.applyContent || ''}</textarea>
-                            </div>
+                    <div class="form-group">
+                        <label>محتوى إمبد التقديم</label>
+                        <textarea name="applyContent" rows="2" placeholder="اكتب هنا النص الذي يظهر في رسالة التقديم">${clan.applyContent || ''}</textarea>
+                    </div>
 
-                            <div class="form-group">
-                                <label>أسئلة التقديم الثلاثة</label>
-                                <input type="text" name="q1" value="${q1}" placeholder="السؤال الأول" style="margin-bottom: 5px;">
-                                <input type="text" name="q2" value="${q2}" placeholder="السؤال الثاني" style="margin-bottom: 5px;">
-                                <input type="text" name="q3" value="${q3}" placeholder="السؤال الثالث">
-                            </div>
+                    <div class="form-group">
+                        <label>أسئلة التقديم الثلاثة</label>
+                        <input type="text" name="q1" value="${q1}" placeholder="السؤال الأول" style="margin-bottom: 5px;">
+                        <input type="text" name="q2" value="${q2}" placeholder="السؤال الثاني" style="margin-bottom: 5px;">
+                        <input type="text" name="q3" value="${q3}" placeholder="السؤال الثالث">
+                    </div>
 
-                            <button type="submit" class="btn-submit">حفظ التعديلات وارسال الإمبد</button>
-                        </form>
-                    `;
+                    <button type="submit" class="btn-submit">حفظ التعديلات وارسال الإمبد</button>
+                </form>
+            `;
                     grid.appendChild(card);
                 });
             } catch (error) {
@@ -189,8 +210,9 @@
             }
         }
 
-        // تشغيل الدالة فور تحميل الصفحة بالكامل
         window.onload = loadClans;
+
     </script>
 </body>
+
 </html>

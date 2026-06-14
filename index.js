@@ -64,46 +64,83 @@ app.get('/login', passport.authenticate('discord'));
 app.get('/callback', passport.authenticate('discord', { failureRedirect: '/' }), (req, res) => {
     res.redirect('/dashboard');
 });
+// صفحة اختيار السيرفرات التي يمتلك فيها المستخدم صلاحية أدمن
+app.get('/dashboard', checkAuth, (req, res) => {
+    // تصفية السيرفرات التي يمتلك المستخدم فيها صلاحية إدارة السيرفر أو المسؤول (الرقم الهيكسي 0x8 أو 0x20)
+    const adminGuilds = req.user.guilds.filter(guild => (guild.permissions & 0x8) === 0x8 || (guild.permissions & 0x20) === 0x20);
+    
+    let guildOptions = adminGuilds.map(g => `
+        <div style="background:#2b2b2b; padding:15px; margin:10px; border-radius:6px; display:flex; justify-content:space-between; align-items:center;">
+            <span>${g.name}</span>
+            <a href="/dashboard/${g.id}" style="background:#0284c7; color:white; padding:8px 12px; text-decoration:none; border-radius:4px; font-weight:bold;">اختيار السيرفر</a>
+        </div>
+    `).join('');
 
-app.get('/dashboard', checkAuth, async (req, res) => {
+    if (adminGuilds.length === 0) {
+        guildOptions = '<p style="text-align:center; color:#ff4444;">لا تمتلك صلاحية إدارة في أي سيرفر مضاف فيه البوت حالياً.</p>';
+    }
+
+    res.send(`
+        <html lang="ar" dir="rtl">
+        <head>
+            <meta charset="UTF-8">
+            <title>اختر السيرفر المراد إدارته</title>
+        </head>
+        <body style="font-family:sans-serif; background:#121212; color:white; padding:40px;">
+            <div style="max-width:600px; margin:0 auto; background:#1e1e1e; padding:20px; border-radius:8px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+                <h2 style="text-align:center; border-bottom:1px solid #333; padding-bottom:15px; margin-bottom:20px;">اختر السيرفر لإدارة الكلانات</h2>
+                ${guildOptions}
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// الدخول إلى لوحة التحكم الخاصة بسيرفر معين وتمرير واجهة الـ HTML له
+app.get('/dashboard/:guildId', checkAuth, (req, res) => {
+    const guildId = req.params.guildId;
+    const hasPerm = req.user.guilds.some(g => g.id === guildId && ((g.permissions & 0x8) === 0x8 || (g.permissions & 0x20) === 0x20));
+    if (!hasPerm) return res.status(403).send('غير مسموح لك بالوصول لإعدادات هذا السيرفر.');
+
     res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
 });
 
-// جلب وتجهيز بيانات الكلانات الـ 8 للداشبورد تلقائياً
-app.get('/api/clans', checkAuth, async (req, res) => {
+// جلب وتجهيز بيانات الكلانات الـ 8 المخصصة للسيرفر المختار حالياً
+app.get('/api/clans/:guildId', checkAuth, async (req, res) => {
+    const guildId = req.params.guildId;
     try {
-        let clans = await Clan.find().sort({ clanIndex: 1 });
+        let clans = await Clan.find({ guildId }).sort({ clanIndex: 1 });
         if (clans.length === 0) {
             for (let i = 1; i <= 8; i++) {
-                await Clan.create({ clanIndex: i });
+                await Clan.create({ clanIndex: i, guildId: guildId });
             }
-            clans = await Clan.find().sort({ clanIndex: 1 });
+            clans = await Clan.find({ guildId }).sort({ clanIndex: 1 });
         }
         res.json(clans);
     } catch (err) {
-        res.status(500).send('خطأ في جلب البيانات');
+        res.status(500).send('حدث خطأ أثناء جلب بيانات الكلانات من قاعدة البيانات.');
     }
 });
 
-// استقبال وتحديث بيانات الكلان المرسلة من الداشبورد
+// استقبال وتحديث بيانات الكلان المرسلة من الداشبورد للسيرفر المحدد
 app.post('/api/clans/update', checkAuth, async (req, res) => {
-    const { clanIndex, leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, interviewChannelId, resultsChannelId, applyContent, pointsName, q1, q2, q3 } = req.body;
+    const { guildId, clanIndex, leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, interviewChannelId, resultsChannelId, applyContent, pointsName, q1, q2, q3 } = req.body;
     try {
-        await Clan.findOneAndUpdate({ clanIndex: parseInt(clanIndex) }, {
+        await Clan.findOneAndUpdate({ guildId, clanIndex: parseInt(clanIndex) }, {
             leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, interviewChannelId, resultsChannelId, applyContent, pointsName,
             questions: [q1, q2, q3]
         }, { upsert: true });
         
-        res.redirect('/dashboard');
-        updateApplyEmbed(parseInt(clanIndex));
+        res.redirect('/dashboard/' + guildId);
+        
+        // استدعاء دالة تحديث الإمبد مع تمرير معرف السيرفر الجديد
+        updateApplyEmbed(guildId, parseInt(clanIndex));
     } catch (err) {
-        res.status(500).send('خطأ في حفظ البيانات');
+        res.status(500).send('حدث خطأ أثناء حفظ التعديلات في قاعدة البيانات.');
     }
 });
-
-// دالة إرسال وتحديث رسالة التقديم داخل الروم المحدد
-async function updateApplyEmbed(clanIndex) {
-    const clan = await Clan.findOne({ clanIndex });
+async function updateApplyEmbed(guildId, clanIndex) {
+    const clan = await Clan.findOne({ guildId, clanIndex });
     if (!clan || !clan.applyChannelId) return;
     const channel = client.channels.cache.get(clan.applyChannelId);
     if (!channel) return;
@@ -130,6 +167,7 @@ async function updateApplyEmbed(clanIndex) {
         await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
     }
 }
+
 // -------------------------------------------------------------
 // أحداث البوت الفردية (تفاعلات التقديم، نقاط الرومات، التحكم)
 // -------------------------------------------------------------
