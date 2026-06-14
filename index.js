@@ -56,6 +56,8 @@ function checkAuth(req, res, next) {
     if (req.isAuthenticated()) return next();
     res.redirect('/login');
 }
+// التوجيه التلقائي عند دخول الرابط الرئيسي
+app.get('/', (req, res) => res.redirect('/login'));
 
 // مسارات التحقق والتوجيه عبر ديسكورد
 app.get('/login', passport.authenticate('discord'));
