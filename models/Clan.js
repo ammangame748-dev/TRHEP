@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 
 const clanSchema = new mongoose.Schema({
-    clanIndex: { type: Number, required: true, unique: true }, // رقم الكلان من 1 إلى 8
+    guildId: { type: String, required: true }, // معرف السيرفر لضمان عمل البوت في أكثر من سيرفر
+    clanIndex: { type: Number, required: true }, // رقم الكلان من 1 إلى 8
     leaderId: { type: String, default: '' },
     clanName: { type: String, default: '' },
     roleId: { type: String, default: '' },
@@ -20,13 +21,16 @@ const clanSchema = new mongoose.Schema({
     membersPoints: {
         type: Map,
         of: Number,
-        default: {}
+        default: new Map()
     },
     messageCounters: {
         type: Map,
         of: Number,
-        default: {}
+        default: new Map()
     }
 });
+
+// منع تكرار نفس رقم الكلان داخل نفس السيرفر
+clanSchema.index({ guildId: 1, clanIndex: 1 }, { unique: true });
 
 module.exports = mongoose.model('Clan', clanSchema);
