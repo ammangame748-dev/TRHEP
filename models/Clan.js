@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const clanSchema = new mongoose.Schema({
-    guildId: { type: String, required: true }, // معرف السيرفر لضمان عمل البوت في أكثر من سيرفر
-    clanIndex: { type: Number, required: true }, // رقم الكلان من 1 إلى 8
+    guildId: { type: String, required: true }, 
+    clanIndex: { type: Number, required: true }, 
     leaderId: { type: String, default: '' },
     clanName: { type: String, default: '' },
     roleId: { type: String, default: '' },
@@ -17,17 +17,27 @@ const clanSchema = new mongoose.Schema({
         type: [String],
         default: ['السؤال الأول', 'السؤال الثاني', 'السؤال الثالث']
     },
-    totalPoints: { type: Number, default: 0 },
-    membersPoints: {
-        type: Map,
-        of: Number,
-        default: new Map()
-    },
-    messageCounters: {
-        type: Map,
-        of: Number,
-        default: new Map()
-    }
+    
+    // [تعديل 1] خزنة الكلان المستقلة الثابتة التي لا تتأثر بمغادرة الأعضاء
+    clanVaultPoints: { type: Number, default: 0 },
+    
+    // [تعديل 2] مفتاح الأمان المشفر لمنع استغلال الأزرار المعلقة وقفل هوية القائد
+    sessionToken: { type: String, default: '' },
+
+    // [تعديل 3] المصفوفة الموحدة للأعضاء لتسهيل الفلترة والتصدر وتتبع الإحصائيات
+    members: [{
+        userId: { type: String, required: true },
+        points: { type: Number, default: 0 },
+        messageCount: { type: Number, default: 0 },
+        voiceMinutes: { type: Number, default: 0 },
+        joinDate: { type: Date, default: Date.now }
+    }],
+
+    // سجل حظر التقديم المؤقت للأعضاء المرفوضين لمنع الإغراق
+    blacklist: [{
+        userId: { type: String, required: true },
+        until: { type: Date, required: true }
+    }]
 });
 
 // منع تكرار نفس رقم الكلان داخل نفس السيرفر
