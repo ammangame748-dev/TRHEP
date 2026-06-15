@@ -181,9 +181,10 @@ client.on('interactionCreate', async interaction => {
     try {
         // معالجة النوافذ المنبثقة (Modals) لقائد الكلان بالهيكلة المطورة
         if (interaction.isModalSubmit() && interaction.customId.startsWith('clan_modal_')) {
-            const parts = interaction.customId.replace('clan_modal_', '').split('_');
-            const action = parts[0];
-            const clanIndex = parseInt(parts[1]);
+          const parts = interaction.customId.replace('clan_modal_', '').split('__'); // تعديل هنا لشرطتين
+const action = parts[0];
+const clanIndex = parseInt(parts[1]);
+
             const guildId = interaction.guild.id;
 
             const clan = await Clan.findOne({ guildId, clanIndex });
@@ -454,9 +455,10 @@ await clan.save();
             if (selection === 'remove_member') modalTitle = 'طرد عضو وتجريده من الكلان';
             if (selection === 'check_member') modalTitle = 'استعلام إحصائيات عضو بالكلان';
 
-            const modal = new ModalBuilder()
-                .setCustomId(`clan_modal_${selection}_${clanIndex}`)
-                .setTitle(modalTitle);
+           const modal = new ModalBuilder()
+    .setCustomId(`clan_modal_${selection}__${clanIndex}`) // تعديل هنا بوضع شرطتين سفليتين متتاليتين __
+    .setTitle(modalTitle);
+
 
             const userIdInput = new TextInputBuilder()
                 .setCustomId('target_user_id')
