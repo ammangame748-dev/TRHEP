@@ -362,7 +362,7 @@ await clan.save();
 
             // 1. حماية صلاحية القيادة الحالية والمباشرة
             if (interaction.user.id !== clan.leaderId) {
-                return interaction.reply({ content: 'أنت لست قائد هذا الكلان الفعلي لاتخاذ هذا الإجراء العسكري.', ephemeral: true });
+                return interaction.reply({ content: 'أنت لست قائد هذا الكلان الفعلي لاتخاذ هذا الإجراء .', ephemeral: true });
             }
 
             // 2. فحص ومطابقة مفتاح أمان الجلسة؛ إذا تغيرت اللوحة يُلغى مفعول الأزرار المعلقة تلقائياً
@@ -394,9 +394,9 @@ await clan.save();
                     }
 
                     if (clan.roleId) await applicant.roles.add(clan.roleId).catch(() => {});
-                    await applicant.send({ content: `🎉 تهانينا الملحمية، لقد تم قبول طلب انضمامك رسمياً لكلان: ${clan.clanName}` }).catch(() => {});
+                    await applicant.send({ content: ` تهانينا الملحمية، لقد تم قبول طلب انضمامك رسمياً لكلان: ${clan.clanName}` }).catch(() => {});
                 }
-                await interaction.reply({ content: `تم قبول العضو، وتجريده من رتب الكلانات المنافسة بنجاح تماسكاً مع الأنظمة.` });
+                await interaction.reply({ content: `تم قبول العضو، وسحب منه رتب الكلانات المنافسة بنجاح   .` });
             } else {
                 // تفعيل خاصية الحظر التلقائي للتقديم لمدة 3 أيام لحماية قنوات النتائج من الإغراق والـ Flood
                 if (applicant) {
@@ -423,7 +423,7 @@ await clan.save();
             const clan = await Clan.findOne({ guildId, clanIndex });
             
             if (!clan || interaction.user.id !== clan.leaderId) {
-                return interaction.reply({ content: 'غير مسموح لك باستخدام هذه القائمة الاستراتيجية المخصصة للقادة الفعليين.', ephemeral: true });
+                return interaction.reply({ content: 'غير مسموح لك باستخدام هذه القائمة  المخصصة للقادة الفعليين.', ephemeral: true });
             }
 
             const selection = interaction.values[0];
@@ -433,17 +433,17 @@ await clan.save();
                     .setTitle(`معلومات الكلان المطور: ${clan.clanName}`)
                     .setColor(0x38bdf8)
                     .addFields(
-                        { name: 'اسم الكلان الفعلي', value: `${clan.clanName || 'غير محدد'}`, inline: true },
-                        { name: 'رصيد الخزنة المستقلة الثابتة', value: `\`${clan.clanVaultPoints}\` \`${clan.pointsName}\``, inline: true },
-                        { name: 'إجمالي الأعضاء النشطين بالداتابيز', value: `\`${clan.members.length}\` لاعب`, inline: true }
+                        { name: 'اسم الكلان ', value: `${clan.clanName || 'غير محدد'}`, inline: true },
+                        { name: 'نقاط الكلان', value: `\`${clan.clanVaultPoints}\` \`${clan.pointsName}\``, inline: true },
+                        { name: 'إجمالي الأعضاء  ', value: `\`${clan.members.length}\` لاعب`, inline: true }
                     );
                 return interaction.reply({ embeds: [infoEmbed], ephemeral: true });
             }
 
             if (selection === 'total_points') {
                 const pointsEmbed = new EmbedBuilder()
-                    .setTitle(`الخزنة البنكية المستقلة لكلان: ${clan.clanName}`)
-                    .setDescription(`النقاط السيادية الثابتة داخل خزنة الكلان هي: \`${clan.clanVaultPoints}\` \`${clan.pointsName}\`\n*(هذه النقاط ثابتة بالخزنة ولا تتأثر بمغادرة أو طرد أي لاعب)*`)
+                    .setTitle(`    نقاط الكلان بشكل كامل: ${clan.clanName}`)
+                    .setDescription(      ` نقاط الكلان  : \`${clan.clanVaultPoints}\` \`${clan.pointsName}\`\n*(هذه النقاط ثابتة بالخزنة ولا تتأثر بمغادرة أو طرد أي لاعب)*`)
                     .setColor(0x059669);
                 return interaction.reply({ embeds: [pointsEmbed], ephemeral: true });
             }
@@ -451,8 +451,8 @@ await clan.save();
             const { ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
             let modalTitle = '';
             
-            if (selection === 'add_member') modalTitle = 'اضافة عضو للكلان الموحد';
-            if (selection === 'remove_member') modalTitle = 'طرد عضو وتجريده من الكلان';
+            if (selection === 'add_member') modalTitle = 'اضافة عضو للكلان ';
+            if (selection === 'remove_member') modalTitle = 'طرد عضو  من الكلان';
             if (selection === 'check_member') modalTitle = 'استعلام إحصائيات عضو بالكلان';
 
            const modal = new ModalBuilder()
