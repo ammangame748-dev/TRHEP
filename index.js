@@ -203,10 +203,13 @@ client.on('interactionCreate', async interaction => {
                 
                 // إضافة العضو للمصفوفة الموحدة الجديدة إذا لم يكن موجوداً مسبقاً
                 const isMemberExist = clan.members.some(m => m.userId === targetId);
-                if (!isMemberExist) {
-                    clan.members.push({ userId: targetId, points: 0, messageCount: 0, voiceMinutes: 0 });
-                    await clan.save();
-                }
+              if (!isMemberExist) {
+    clan.members.push({ userId: targetId, points: 0, messageCount: 0, voiceMinutes: 0 });
+
+    clan.members = clan.members.filter(m => m && m.userId);
+
+    await clan.save();
+}
 
                 if (clan.roleId) await member.roles.add(clan.roleId).catch(() => {});
                 responseEmbed.setTitle('تحديث الرتب والأعضاء').setDescription(`تم إضافة العضو <@${targetId}> بنجاح للمصفوفة الموحدة وتعيين رتبة الكلان له.`);
@@ -219,9 +222,10 @@ client.on('interactionCreate', async interaction => {
                     return interaction.editReply({ embeds: [responseEmbed] });
                 }
 
-                // سحب رتب الكلان وحذفه من المصفوفة الموحدة فوراً دون تصفير نقاط الخزنة الثابتة
-                clan.members = clan.members.filter(m => m.userId !== targetId);
-                await clan.save();
+               clan.members = clan.members.filter(m => m.userId !== targetId);
+clan.members = clan.members.filter(m => m && m.userId);
+
+await clan.save();
 
                 if (clan.roleId) await member.roles.remove(clan.roleId).catch(() => {});
                 responseEmbed.setTitle('تحديث الرتب والأعضاء').setDescription(`تم طرد العضو <@${targetId}> وسحب الرتبة وحذفه من المصفوفة الموحدة للكلان.`);
@@ -398,7 +402,10 @@ client.on('interactionCreate', async interaction => {
                     const blockUntil = new Date();
                     blockUntil.setDate(blockUntil.getDate() + 3); // 3 أيام حظر
                     clan.blacklist.push({ userId: applicantId, until: blockUntil });
-                    await clan.save();
+
+clan.members = clan.members.filter(m => m && m.userId);
+
+await clan.save();
 
                     await applicant.send({ content: `نعتذر منك، لقد تم رفض طلب انضمامك لكلان: ${clan.clanName}. يمكنك التقديم مجدداً بعد 3 أيام.` }).catch(() => {});
                 }
