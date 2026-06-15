@@ -488,17 +488,17 @@ client.on('messageCreate', async message => {
             if (clan && message.author.id === clan.leaderId) {
                 const menu = new StringSelectMenuBuilder()
                     .setCustomId(`leader_menu_${message.guild.id}_${clan.clanIndex}`)
-                    .setPlaceholder('اختر الإجراء العسكري والإداري المطلـوب')
+                    .setPlaceholder(' للتحكم بالكلان اختر من القائمه ')
                     .addOptions([
                         { label: 'معلومات الكلان الشاملة', value: 'info' },
-                        { label: 'اضافة عضو للكلان الموحد', value: 'add_member' },
-                        { label: 'طرد وتجريد عضو من الكلان', value: 'remove_member' },
+                        { label: 'اضافة عضو للكلان ', value: 'add_member' },
+                        { label: 'طرد  عضو من الكلان', value: 'remove_member' },
                         { label: 'استعلام عن نقاط وإحصائيات عضو', value: 'check_member' },
-                        { label: 'نقاط الخزنة السيادية الثابتة', value: 'total_points' }
+                        { label: 'نقاط الخزنة  للكلان', value: 'total_points' }
                     ]);
 
                 const row = new ActionRowBuilder().addComponents(menu);
-                return message.reply({ content: 'لوحة التحكم الاستراتيجية وإدارة الكلان المخصصة للقائد المباشر:', components: [row] });
+                return message.reply({ content: ' للتحكم بالكلان', components: [row] });
             }
         }
 
