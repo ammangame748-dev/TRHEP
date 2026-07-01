@@ -271,7 +271,12 @@ client.on('interactionCreate', async interaction => {
                 const currentPts = memberData ? memberData.points : 0;
                 
                 responseEmbed.setTitle('📊 إحصائيات العضو')
-                    .setDescription(`**العضو:** <@${targetId}>\n\n• **النقاط:** \`${currentPts}\` ${clan.pointsName}\n• **الرسائل:** \`${memberData ? memberData.messageCount : 0}\`\n• **دقائق الصوت:** \`${memberData ? memberData.voiceMinutes : 0}\` دقائق`)
+                    .addFields(
+                        { name: '👤 العضو', value: `<@${targetId}>`, inline: true },
+                        { name: `💰 النقاط (${clan.pointsName})`, value: `${currentPts}`, inline: true },
+                        { name: '💬 رسائل الشات', value: `${memberData ? memberData.messageCount : 0}`, inline: true },
+                        { name: '🎤 دقائق الصوت', value: `${memberData ? memberData.voiceMinutes : 0}`, inline: true }
+                    )
                     .setColor(0x059669);
                 return interaction.editReply({ embeds: [responseEmbed] });
             }
@@ -280,6 +285,106 @@ client.on('interactionCreate', async interaction => {
         if (!interaction.isButton() && !interaction.isStringSelectMenu()) return;
 
         // معالجة زر التقديم
+        // معالجة منيو أوامر الكلان
+        if (interaction.isStringSelectMenu() && interaction.customId.startsWith('clan_menu_')) {
+            const parts = interaction.customId.replace('clan_menu_', '').split('_');
+            const guildId = parts[0];
+            const clanIndex = parseInt(parts[1]);
+            const selectedCommand = interaction.values[0];
+
+            const clan = await Clan.findOne({ guildId, clanIndex });
+            if (!clan) return interaction.reply({ content: '❌ حدث خطأ في جلب بيانات الكلان.', ephemeral: true });
+
+            await interaction.deferReply({ ephemeral: true });
+
+            const responseEmbed = new EmbedBuilder().setColor(0x38bdf8);
+
+            // معلومات الكلان
+            if (selectedCommand === 'info') {
+                const totalMembers = clan.members.length;
+                const totalPoints = clan.members.reduce((sum, m) => sum + m.points, 0);
+
+                responseEmbed
+                    .setTitle('📋 معلومات الكلان الشاملة')
+                    .addFields(
+                        { name: '🏆 اسم الكلان', value: clan.clanName || 'غير محدد', inline: true },
+                        { name: '👑 قائد الكلان', value: clan.leaderId ? `<@${clan.leaderId}>` : 'غير محدد', inline: true },
+                        { name: '👥 عدد الأعضاء', value: `${totalMembers}`, inline: true },
+                        { name: `💎 إجمالي النقاط (${clan.pointsName})`, value: `${totalPoints}`, inline: true },
+                        { name: '🏦 نقاط الخزنة', value: `${clan.clanVaultPoints}`, inline: true },
+                        { name: '📊 إجمالي النقاط', value: `${totalPoints + clan.clanVaultPoints}`, inline: true }
+                    )
+                    .setFooter({ text: `الكلان #${clanIndex}` });
+
+                return interaction.editReply({ embeds: [responseEmbed] });
+            }
+
+            // إضافة عضو
+            if (selectedCommand === 'add_member') {
+                const modal = new ModalBuilder()
+                    .setCustomId(`clan_modal_add_member__${clanIndex}`)
+                    .setTitle('إضافة عضو للكلان');
+
+                const input = new TextInputBuilder()
+                    .setCustomId('target_user_id')
+                    .setLabel('معرف المستخدم (User ID)')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('أدخل معرف المستخدم')
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                return interaction.showModal(modal);
+            }
+
+            // طرد عضو
+            if (selectedCommand === 'remove_member') {
+                const modal = new ModalBuilder()
+                    .setCustomId(`clan_modal_remove_member__${clanIndex}`)
+                    .setTitle('طرد عضو من الكلان');
+
+                const input = new TextInputBuilder()
+                    .setCustomId('target_user_id')
+                    .setLabel('معرف المستخدم (User ID)')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('أدخل معرف المستخدم')
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                return interaction.showModal(modal);
+            }
+
+            // استعلام عن عضو
+            if (selectedCommand === 'check_member') {
+                const modal = new ModalBuilder()
+                    .setCustomId(`clan_modal_check_member__${clanIndex}`)
+                    .setTitle('استعلام عن عضو');
+
+                const input = new TextInputBuilder()
+                    .setCustomId('target_user_id')
+                    .setLabel('معرف المستخدم (User ID)')
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder('أدخل معرف المستخدم')
+                    .setRequired(true);
+
+                modal.addComponents(new ActionRowBuilder().addComponents(input));
+                return interaction.showModal(modal);
+            }
+
+            // نقاط الخزنة
+            if (selectedCommand === 'vault_points') {
+                responseEmbed
+                    .setTitle('🏦 نقاط خزنة الكلان')
+                    .setDescription(`إجمالي النقاط المحفوظة في خزنة الكلان`)
+                    .addFields(
+                        { name: '💰 النقاط', value: `${clan.clanVaultPoints} ${clan.pointsName}`, inline: false },
+                        { name: '📈 آخر تحديث', value: `<t:${Math.floor(Date.now() / 1000)}:R>`, inline: false }
+                    )
+                    .setFooter({ text: `الكلان #${clanIndex}` });
+
+                return interaction.editReply({ embeds: [responseEmbed] });
+            }
+        }
+
         if (interaction.isButton() && interaction.customId.startsWith('applybtn_')) {
             const parts = interaction.customId.split('_');
             const guildId = parts[1];
@@ -318,6 +423,48 @@ client.on('interactionCreate', async interaction => {
         }
     } catch (err) {
         console.error('خطأ في معالجة التفاعل:', err);
+    }
+});
+
+// =============================================================
+// نظام أوامر الكلان مع المنيو
+// =============================================================
+
+const clanCommands = {
+    'معلومات': 'info',
+    'إضافة عضو': 'add_member',
+    'طرد عضو': 'remove_member',
+    'استعلام عضو': 'check_member',
+    'نقاط الخزنة': 'vault_points'
+};
+
+client.on('messageCreate', async message => {
+    try {
+        if (message.author.bot) return;
+
+        // البحث عن كلمة "تحكم" فقط
+        if (message.content.toLowerCase().trim() === 'تحكم') {
+            const activeClan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
+            if (!activeClan) return;
+
+            // إنشاء منيو الأوامر
+            const menu = new StringSelectMenuBuilder()
+                .setCustomId(`clan_menu_${message.guild.id}_${activeClan.clanIndex}`)
+                .setPlaceholder('اختر أمر للتحكم بالكلان')
+                .addOptions([
+                    { label: '📋 معلومات الكلان', value: 'info', description: 'عرض معلومات شاملة عن الكلان' },
+                    { label: '➕ إضافة عضو', value: 'add_member', description: 'إضافة عضو جديد للكلان' },
+                    { label: '➖ طرد عضو', value: 'remove_member', description: 'طرد عضو من الكلان' },
+                    { label: '👤 استعلام عن عضو', value: 'check_member', description: 'عرض إحصائيات العضو' },
+                    { label: '💰 نقاط الخزنة', value: 'vault_points', description: 'عرض نقاط خزنة الكلان' }
+                ]);
+
+            const row = new ActionRowBuilder().addComponents(menu);
+            await message.reply({ content: '**🎮 قائمة التحكم بالكلان**', components: [row] });
+            return;
+        }
+    } catch (err) {
+        console.error('خطأ في نظام أوامر الكلان:', err);
     }
 });
 
