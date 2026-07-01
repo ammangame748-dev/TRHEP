@@ -383,7 +383,11 @@
 
         async function fetchGuildMeta() {
             try {
-                const res = await fetch(`/api/guild-meta/${guildId}`);
+                const res = await fetch(`/api/guild-meta/${guildId}`, { credentials: 'same-origin' });
+                if (res.status === 401 || res.redirected) {
+                    window.location.href = '/login';
+                    return;
+                }
                 if (!res.ok) throw new Error('Failed to fetch guild meta');
                 guildMeta = await res.json();
                 populateSelects();
@@ -423,7 +427,11 @@
 
         async function fetchClans() {
             try {
-                const res = await fetch(`/api/clans/${guildId}`);
+                const res = await fetch(`/api/clans/${guildId}`, { credentials: 'same-origin' });
+                if (res.status === 401 || res.redirected) {
+                    window.location.href = '/login';
+                    return;
+                }
                 if (!res.ok) throw new Error('Failed to fetch clans');
                 allClansData = await res.json();
                 renderTabs();
@@ -482,7 +490,12 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(data),
+                    credentials: "same-origin"
                 });
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
                 if (res.ok) {
                     showAlert('✓ تم حفظ الإعدادات بنجاح', 'success');
                     fetchClans();
@@ -503,7 +516,12 @@
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ guildId, clanIndex: parseInt(clanIndex) }),
+                    credentials: "same-origin"
                 });
+                if (res.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
                 if (res.ok) {
                     showAlert('✓ تم تحديث الرسالة بنجاح', 'success');
                 } else {
