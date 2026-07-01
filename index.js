@@ -1,545 +1,1020 @@
-require("dotenv").config();
-const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ChannelType } = require("discord.js");
-const express = require("express");
-const session = require("express-session");
-const passport = require("passport");
-const DiscordStrategy = require("passport-discord").Strategy;
-const mongoose = require("mongoose");
-const path = require("path");
-const fs = require("fs");
+// ╔══════════════════════════════════════════════════════════════════════════╗
+// ║                   🎵 MUSIC BOT - Discord Bot 🎵                          ║
+// ║              ملف واحد - كل الميزات - JavaScript                        ║
+// ╚══════════════════════════════════════════════════════════════════════════╝
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+const {
+    Client,
+    GatewayIntentBits,
+    Partials,
+    Collection,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    EmbedBuilder,
+    PermissionFlagsBits,
+    Events
+} = require('discord.js');
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log("تم الاتصال بقاعدة البيانات بنجاح"))
-    .catch(err => console.error("خطأ في الاتصال بقاعدة البيانات:", err));
+const { Player, QueryType } = require('discord-player');
+const { DefaultExtractors } = require('@discord-player/extractor');
+const fs = require('fs');
+const path = require('path');
 
-// Discord Client Setup
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔧 إعدادات
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TOKEN = process.env.DISCORD_TOKEN || 'ضع_توكن_البوت_هنا';
+const SAVES_FILE = path.join(__dirname, 'saves.json');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 💾 نظام المحفوظات
+// ═══════════════════════════════════════════════════════════════════════════
+
+function loadSaves() {
+    try {
+        if (fs.existsSync(SAVES_FILE)) {
+            return JSON.parse(fs.readFileSync(SAVES_FILE, 'utf-8'));
+        }
+    } catch (e) { /* ignore */ }
+    return {};
+}
+
+function saveSaves(data) {
+    try {
+        fs.writeFileSync(SAVES_FILE, JSON.stringify(data, null, 2));
+    } catch (e) {
+        console.error('[SAVES] خطأ في الحفظ:', e.message);
+    }
+}
+
+let saves = loadSaves();
+
+function getUserSaves(userId) {
+    if (!saves[userId]) saves[userId] = [];
+    return saves[userId];
+}
+
+function addSave(userId, track) {
+    const userSaves = getUserSaves(userId);
+    const exists = userSaves.find(s => s.url === track.url);
+    if (!exists) {
+        userSaves.push({
+            title: track.title,
+            author: track.author || 'غير معروف',
+            duration: track.duration,
+            url: track.url,
+            thumbnail: track.thumbnail || '',
+            addedAt: new Date().toISOString()
+        });
+        saveSaves(saves);
+        return true;
+    }
+    return false;
+}
+
+function removeSave(userId, index) {
+    const userSaves = getUserSaves(userId);
+    if (userSaves[index]) {
+        userSaves.splice(index, 1);
+        saveSaves(saves);
+        return true;
+    }
+    return false;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🤖 إعداد البوت
+// ═══════════════════════════════════════════════════════════════════════════
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildVoiceStates,
-        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent
     ],
-    partials: [Partials.Channel, Partials.Message, Partials.User, Partials.GuildMember],
+    partials: [Partials.Channel]
 });
 
-// Passport Session Setup
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
+const player = new Player(client);
 
-// Discord Strategy for Passport
-passport.use(new DiscordStrategy({
-    clientID: process.env.CLIENT_ID,
-    clientSecret: process.env.CLIENT_SECRET,
-    callbackURL: process.env.REDIRECT_URI,
-    scope: ["identify", "guilds"],
-}, (accessToken, refreshToken, profile, done) => {
-    process.nextTick(() => done(null, profile));
-}));
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎧 إعداد المشغل (Player Events)
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Express Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(session({
-    secret: process.env.SESSION_SECRET || "change-this-to-a-long-random-secret",
-    resave: false,
-    saveUninitialized: false,
-    proxy: true,
-    cookie: {
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 24 * 60 * 60 * 1000,
-        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-        httpOnly: true
+// عند بدء تشغيل أغنية جديدة
+player.events.on('playerStart', (queue, track) => {
+    sendNowPlayingMessage(queue, track);
+});
+
+// عند انتهاء أغنية - إضافة تلقائية للمحفوظات
+player.events.on('playerFinish', (queue) => {
+    const currentTrack = queue.previousTrack;
+    if (currentTrack && queue.metadata?.userId) {
+        const userId = queue.metadata.userId;
+        const wasAdded = addSave(userId, currentTrack);
+        if (wasAdded && queue.metadata.channel) {
+            try {
+                queue.metadata.channel.send({
+                    embeds: [new EmbedBuilder()
+                        .setColor(0x00ff00)
+                        .setDescription(`✅ تم حفظ **${truncate(currentTrack.cleanTitle, 50)}** في المحفوظات تلقائياً!`)
+                        .setFooter({ text: 'استخدم /saves لمشاهدة المحفوظات' })
+                    ]
+                });
+            } catch (e) { /* ignore */ }
+        }
     }
-}));
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Helper function for permission checking
-function hasAdminPermissions(guildPermissions) {
-    return (guildPermissions & 0x8) === 0x8 || (guildPermissions & 0x20) === 0x20;
-}
-
-// Middleware to check authentication
-function checkAuth(req, res, next) {
-    if (req.isAuthenticated()) return next();
-    res.redirect("/login");
-}
-
-// Routes
-app.get("/", (req, res) => {
-    if (req.isAuthenticated()) return res.redirect("/dashboard");
-    res.redirect("/login");
-});
-app.get("/login", passport.authenticate("discord"));
-app.get("/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => {
-    res.redirect("/dashboard");
 });
 
-// دالة تقرأ ملف HTML وترجعه كـ string
-function readView(filename) {
-    return fs.readFileSync(path.join(__dirname, "views", filename), "utf-8");
+// عند إيقاف مؤقت
+player.events.on('playerPause', (queue, track) => {
+    updateNowPlayingMessage(queue, track, '▶️ تم الإيقاف المؤقت');
+});
+
+// عند استئناف التشغيل
+player.events.on('playerResume', (queue, track) => {
+    updateNowPlayingMessage(queue, track, '▶️ تم الاستئناف');
+});
+
+// عند تغيير الصوت
+player.events.on('playerVolumeUpdate', (queue, volume) => {
+    if (queue.metadata?.nowPlayingMsgId) {
+        try {
+            updateNowPlayingMessage(queue, queue.currentTrack);
+        } catch (e) { /* ignore */ }
+    }
+});
+
+// عند تغيير القناة الصوتية
+player.events.on('playerDisconnect', (queue) => {
+    if (queue.metadata?.nowPlayingMsgId && queue.metadata.channel) {
+        try {
+            queue.metadata.channel.messages.fetch(queue.metadata.nowPlayingMsgId)
+                .then(msg => msg.edit({
+                    components: [],
+                    embeds: [new EmbedBuilder()
+                        .setColor(0x333333)
+                        .setDescription('🔇 تم مغادرة القناة الصوتية')
+                    ]
+                }))
+                .catch(() => {});
+        } catch (e) { /* ignore */ }
+    }
+});
+
+// عند خطأ
+player.events.on('error', (queue, error) => {
+    console.error(`[PLAYER ERROR] ${error.message}`);
+    if (queue.metadata?.channel) {
+        try {
+            queue.metadata.channel.send({
+                embeds: [new EmbedBuilder()
+                    .setColor(0xff0000)
+                    .setTitle('❌ حدث خطأ')
+                    .setDescription(error.message)
+                ]
+            });
+        } catch (e) { /* ignore */ }
+    }
+});
+
+// عند انقطاع الاتصال
+player.events.on('debug', (queue, message) => {
+    // يمكن تفعيل للتصحيح
+    // console.log(`[DEBUG] ${message}`);
+});
+
+// عند إضافة أغنية للقائمة
+player.events.on('queueAddTrack', (queue, track) => {
+    // يمكن إضافة إشعار هنا
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📤 دوال الرسائل
+// ═══════════════════════════════════════════════════════════════════════════
+
+function truncate(str, len) {
+    return str.length > len ? str.substring(0, len) + '...' : str;
 }
 
-// دالة لحقن بيانات السيرفرات في HTML
-function injectGuildData(html, guildId = null) {
-    const adminGuilds = [];
-    if (typeof global.__cachedAdminGuilds__ !== 'undefined' && guildId === null) {
-        // For main dashboard, use cached guilds
-        return html.replace(
-            "<!-- GUILD_DATA -->",
-            `<script>window.__adminGuilds__ = ${JSON.stringify(global.__cachedAdminGuilds__)};</script>`
+function formatDuration(duration) {
+    if (!duration) return 'غير معروف';
+    const mins = Math.floor(duration / 60000);
+    const secs = Math.floor((duration % 60000) / 1000);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+function formatQueueDuration(queue) {
+    const totalMs = queue.tracks.data.reduce((sum, t) => sum + (t.duration || 0), 0);
+    return formatDuration(totalMs);
+}
+
+function createNowPlayingEmbed(track, queue, extraMsg) {
+    const progressBar = queue ? generateProgressBar(queue) : '─────────────';
+
+    return new EmbedBuilder()
+        .setColor(0x5865F2)
+        .setTitle('🎵 مشغّل الموسيقى')
+        .setThumbnail(track.thumbnail || track.author?.avatar || null)
+        .addFields(
+            {
+                name: 'الأغنية الحالية',
+                value: `**${truncate(track.cleanTitle || track.title, 100)}**\n` +
+                       `👤 **بواسطة:** ${track.author || 'غير معروف'}\n` +
+                       `⏱️ **المدة:** ${formatDuration(track.duration)}`,
+                inline: true
+            },
+            {
+                name: 'معلومات القائمة',
+                value: `📊 **عدد الأغاني:** ${queue ? queue.tracks.size : 0}\n` +
+                       `⏰ **المدة الكلية:** ${queue ? formatQueueDuration(queue) : 'غير معروف'}\n` +
+                       `🔊 **الصوت:** ${queue ? queue.node.volume : 100}%`,
+                inline: true
+            },
+            { name: '\u200b', value: progressBar, inline: false }
+        )
+        .setFooter({
+            text: extraMsg || 'استخدم الأزرار للتحكم'
+        })
+        .setTimestamp();
+}
+
+function generateProgressBar(queue) {
+    if (!queue.currentTrack || !queue.currentTrack.duration) {
+        return '━━━━━━━━━━━━━━━━━━━━';
+    }
+
+    const duration = queue.currentTrack.duration;
+    const current = queue.node.getTime() || 0;
+    const progress = Math.min((current / duration) * 100, 100);
+
+    const filled = Math.round(progress / 5);
+    const empty = 20 - filled;
+    const bar = '▓'.repeat(filled) + '░'.repeat(empty);
+    const currentPos = formatDuration(current);
+    const totalPos = formatDuration(duration);
+
+    return `${currentPos} ━ ${bar} ━ ${totalPos}`;
+}
+
+function createControlButtons() {
+    return new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('btn_previous')
+                .setEmoji('⏮️')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_pause')
+                .setEmoji('⏸️')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_stop')
+                .setEmoji('⏹️')
+                .setStyle(ButtonStyle.Danger),
+            new ButtonBuilder()
+                .setCustomId('btn_next')
+                .setEmoji('⏭️')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_loop')
+                .setEmoji('🔁')
+                .setStyle(ButtonStyle.Secondary)
         );
-    }
-
-    // Always fetch fresh guilds from session
-    return html;
 }
 
-app.get("/dashboard", checkAuth, (req, res) => {
-    const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
-    // حفظ السيرفرات في متغير عام للاستخدام
-    req.session.adminGuilds = adminGuilds;
-    // نعرض الداشبورد مباشرة مع إرسال بيانات السيرفرات
-    let html = readView("dashboard.html");
-    html = html.replace(
-        "<!-- GUILD_DATA -->",
-        `<script>window.__adminGuilds__ = ${JSON.stringify(adminGuilds)};</script>`
-    );
-    res.send(html);
-});
+function createVolumeButtons(volume) {
+    return new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('btn_vol_down')
+                .setEmoji('🔉')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_vol_up')
+                .setEmoji('🔊')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setDisabled(true)
+                .setLabel(`${volume || 100}%`)
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('btn_skip_to')
+                .setEmoji('⏩')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_back_menu')
+                .setEmoji('🔙')
+                .setStyle(ButtonStyle.Secondary)
+        );
+}
 
-app.get("/dashboard/:guildId", checkAuth, async (req, res) => {
-    const guildId = req.params.guildId;
-    const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
-    if (!hasPerm) return res.status(403).send("غير مسموح لك بالوصول.");
+function createMenuRow() {
+    return new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('btn_now_playing')
+                .setEmoji('🎵')
+                .setLabel('مشغّل الآن')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('btn_queue')
+                .setEmoji('📋')
+                .setLabel('القائمة')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_volume')
+                .setEmoji('🔊')
+                .setLabel('الصوت')
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_saves')
+                .setEmoji('💾')
+                .setLabel('محفوظاتي')
+                .setStyle(ButtonStyle.Secondary)
+        );
+}
 
-    const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
-    let html = readView("dashboard.html");
-    // نوصل guildId و adminGuilds للـ HTML
-    html = html.replace(
-        "<!-- GUILD_DATA -->",
-        `<script>window.__guildId__ = "${guildId}"; window.__adminGuilds__ = ${JSON.stringify(adminGuilds)};</script>`
-    );
-    res.send(html);
-});
+function createLoopRow(loopMode) {
+    const loopEmoji = loopMode === 'off' ? '🔁' : loopMode === 'track' ? '🔂' : '🔁';
+    const loopLabel = loopMode === 'off' ? 'بدون تكرار' : loopMode === 'track' ? 'كرر أغنية' : 'كرر القائمة';
+    return new ActionRowBuilder()
+        .addComponents(
+            new ButtonBuilder()
+                .setCustomId('btn_loop_mode')
+                .setEmoji(loopEmoji)
+                .setLabel(loopLabel)
+                .setStyle(ButtonStyle.Secondary),
+            new ButtonBuilder()
+                .setCustomId('btn_saves')
+                .setEmoji('💾')
+                .setLabel('محفوظاتي')
+                .setStyle(ButtonStyle.Secondary)
+        );
+}
 
-app.get("/api/guild-meta/:guildId", checkAuth, async (req, res) => {
-    const guild = client.guilds.cache.get(req.params.guildId);
-    if (!guild) return res.status(404).json({ error: "السيرفر غير موجود" });
+// ═══════════════════════════════════════════════════════════════════════════
+// 📡 رسائل Now Playing
+// ═══════════════════════════════════════════════════════════════════════════
+
+function sendNowPlayingMessage(queue, track) {
+    if (!queue.metadata?.channel) return;
+
+    const embed = createNowPlayingEmbed(track, queue);
+    const buttons = createControlButtons();
+    const menu = createMenuRow();
+
+    queue.metadata.channel.send({
+        embeds: [embed],
+        components: [buttons, menu]
+    }).then(msg => {
+        queue.metadata.nowPlayingMsgId = msg.id;
+    }).catch(() => {});
+}
+
+function updateNowPlayingMessage(queue, track, extraMsg) {
+    if (!queue.metadata?.nowPlayingMsgId || !queue.metadata?.channel) return;
+
+    queue.metadata.channel.messages.fetch(queue.metadata.nowPlayingMsgId)
+        .then(msg => {
+            const embed = createNowPlayingEmbed(track, queue, extraMsg);
+            msg.edit({ embeds: [embed] }).catch(() => {});
+        })
+        .catch(() => {
+            sendNowPlayingMessage(queue, track);
+        });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ⌨️ الأوامر (Slash Commands)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// أمر التشغيل
+const playCommand = {
+    name: 'play',
+    description: 'تشغيل أغنية أو قائمة تشغيل',
+    options: [{
+        name: 'query',
+        description: 'اسم الأغنية أو رابط يوتيوب/سبوتيفاي',
+        type: 3, // STRING
+        required: true,
+        autocomplete: true
+    }]
+};
+
+// أمر التخطي
+const skipCommand = {
+    name: 'skip',
+    description: 'تخطي الأغنية الحالية'
+};
+
+// أمر الإيقاف
+const stopCommand = {
+    name: 'stop',
+    description: 'إيقاف التشغيل ومغادرة القناة الصوتية'
+};
+
+// أمر القائمة
+const queueCommand = {
+    name: 'queue',
+    description: 'عرض قائمة التشغيل الحالية'
+};
+
+// أمر المحفوظات
+const savesCommand = {
+    name: 'saves',
+    description: 'عرض أغانيك المحفوظة'
+};
+
+// أمر مسح المحفوظات
+const clearSavesCommand = {
+    name: 'clearsaves',
+    description: 'مسح جميع المحفوظات'
+};
+
+// أمر الصوت
+const volumeCommand = {
+    name: 'volume',
+    description: 'تعديل مستوى الصوت',
+    options: [{
+        name: 'level',
+        description: 'مستوى الصوت (1-100)',
+        type: 4, // INTEGER
+        required: true,
+        min_value: 1,
+        max_value: 100
+    }]
+};
+
+// أمر التكرار
+const loopCommand = {
+    name: 'loop',
+    description: 'تفعيل/تعطيل التكرار',
+    options: [{
+        name: 'mode',
+        description: 'وضع التكرار',
+        type: 3, // STRING
+        required: true,
+        choices: [
+            { name: 'بدون تكرار', value: 'off' },
+            { name: 'كرر الأغنية', value: 'track' },
+            { name: 'كرر القائمة', value: 'queue' }
+        ]
+    }]
+};
+
+// أمر البحث
+const searchCommand = {
+    name: 'search',
+    description: 'البحث عن أغنية بدون تشغيلها',
+    options: [{
+        name: 'query',
+        description: 'ما تريد البحث عنه',
+        type: 3, // STRING
+        required: true
+    }]
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔌 عند الاتصال
+// ═══════════════════════════════════════════════════════════════════════════
+
+client.once(Events.ClientReady, async () => {
+    console.log(`✅ البوت متصل بنجاح!`);
+    console.log(`👤 الاسم: ${client.user.tag}`);
+    console.log(`🌐 السيرفرات: ${client.guilds.cache.size}`);
+
+    // تسجيل الأوامر
+    const commands = [
+        playCommand, skipCommand, stopCommand, queueCommand,
+        savesCommand, clearSavesCommand, volumeCommand, loopCommand, searchCommand
+    ];
 
     try {
-        await guild.members.fetch();
-        const roles = guild.roles.cache.filter(r => r.name !== "@everyone").map(r => ({ id: r.id, name: r.name }));
-        const channels = guild.channels.cache;
-        const textChannels = channels.filter(c => c.type === ChannelType.GuildText).map(c => ({ id: c.id, name: c.name }));
-        const voiceChannels = channels.filter(c => c.type === ChannelType.GuildVoice).map(c => ({ id: c.id, name: c.name }));
-
-        res.json({ roles, textChannels, voiceChannels });
+        await client.application.commands.set(commands);
+        console.log('✅ تم تسجيل الأوامر بنجاح!');
     } catch (error) {
-        console.error(`Error fetching guild meta for ${req.params.guildId}:`, error);
-        res.status(500).json({ error: "خطأ في جلب بيانات السيرفر" });
+        console.error('❌ خطأ في تسجيل الأوامر:', error);
     }
 });
 
-app.get("/api/clans/:guildId", checkAuth, async (req, res) => {
-    const guildId = req.params.guildId;
-    const Clan = require("./models/Clan");
-    try {
-        let clans = await Clan.find({ guildId }).sort({ clanIndex: 1 });
-        if (clans.length === 0) {
-            const newClans = [];
-            for (let i = 1; i <= 8; i++) {
-                newClans.push({ clanIndex: i, guildId: guildId });
-            }
-            await Clan.insertMany(newClans);
-            clans = await Clan.find({ guildId }).sort({ clanIndex: 1 });
+// ═══════════════════════════════════════════════════════════════════════════
+// 🔄 معالجة التفاعلات
+// ═══════════════════════════════════════════════════════════════════════════
+
+client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isButton() && !interaction.isAutocomplete()) return;
+
+    // ═══════════════════════════════════════════════════════════
+    // 🔍 بحث تلقائي (Autocomplete)
+    // ═══════════════════════════════════════════════════════════
+    if (interaction.isAutocomplete()) {
+        if (interaction.commandName !== 'play') return;
+        const query = interaction.options.getFocused();
+        if (!query || query.length < 2) {
+            await interaction.respond([]);
+            return;
         }
-        res.json(clans);
-    } catch (err) {
-        console.error("خطأ في جلب بيانات الكلانات:", err);
-        res.status(500).send("خطأ في جلب البيانات");
+
+        try {
+            const searchResults = await player.search(query, {
+                requestedBy: interaction.user,
+                searchEngine: QueryType.YOUTUBE_SEARCH
+            });
+
+            const suggestions = searchResults.tracks
+                .slice(0, 25)
+                .map(track => ({
+                    name: truncate(`${track.cleanTitle} - ${track.author}`, 100),
+                    value: track.url
+                }));
+
+            await interaction.respond(suggestions.length > 0 ? suggestions : []);
+        } catch (e) {
+            await interaction.respond([]);
+        }
+        return;
     }
-});
 
-app.post("/api/clans/update", checkAuth, async (req, res) => {
-    const { guildId, clanIndex, leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, resultsChannelId, applyContent, pointsName, q1, q2, q3 } = req.body;
-    const Clan = require("./models/Clan");
-    const crypto = require("crypto");
-    try {
-        const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
-        if (!hasPerm) return res.status(403).send("غير مصرح لك.");
+    // ═══════════════════════════════════════════════════════════
+    // 🎮 أزرار التحكم
+    // ═══════════════════════════════════════════════════════════
 
-        if (!guildId || !clanIndex) return res.status(400).send("بيانات غير كاملة.");
+    const queue = player.queues.get(interaction.guild.id);
 
-        const newToken = crypto.randomBytes(16).toString("hex");
-        await Clan.findOneAndUpdate({ guildId, clanIndex: parseInt(clanIndex) }, {
-            leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, resultsChannelId, applyContent, pointsName,
-            questions: [q1, q2, q3].filter(q => q && q.trim() !== ""),
-            sessionToken: newToken,
-        }, { upsert: true, new: true });
-
-        res.status(200).send("تم حفظ الإعدادات بنجاح!");
-    } catch (err) {
-        console.error("خطأ في حفظ إعدادات الكلان:", err);
-        res.status(500).send("خطأ في الحفظ");
+    // أزرار التحكم الأساسية
+    if (interaction.customId === 'btn_previous') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        queue.node.previous();
+        await interaction.reply({ content: '⏮️ تم التشغيل للأغنية السابقة', ephemeral: true });
+        return;
     }
-});
 
-app.post("/api/update-embed", checkAuth, async (req, res) => {
-    const { guildId, clanIndex } = req.body;
-    try {
-        const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
-        if (!hasPerm) return res.status(403).send("غير مصرح لك.");
-
-        await updateApplyEmbed(guildId, clanIndex);
-        res.status(200).send("تم تحديث رسالة التقديم بنجاح!");
-    } catch (error) {
-        console.error("خطأ في تحديث رسالة التقديم عبر API:", error);
-        res.status(500).send("فشل تحديث رسالة التقديم.");
-    }
-});
-
-// Discord Bot Functions
-async function updateApplyEmbed(guildId, clanIndex) {
-    const Clan = require("./models/Clan");
-    try {
-        const clan = await Clan.findOne({ guildId, clanIndex });
-        if (!clan || !clan.applyChannelId) return console.log(`No clan or applyChannelId for guild ${guildId}, clan ${clanIndex}`);
-
-        const channel = await client.channels.fetch(clan.applyChannelId).catch(e => {
-            console.error(`Failed to fetch apply channel ${clan.applyChannelId}:`, e.message);
-            return null;
-        });
-        if (!channel) return;
-
-        const embed = new EmbedBuilder()
-            .setTitle(`تقديم الانضمام إلى كلان: ${clan.clanName || "غير محدد"}`)
-            .setDescription(clan.applyContent || "اضغط على الزر أدناه للتقديم.")
-            .setColor(0x38bdf8);
-
-        const button = new ButtonBuilder()
-            .setCustomId(`applybtn_${guildId}_${clanIndex}`)
-            .setLabel("تقديم طلب انضمام")
-            .setStyle(ButtonStyle.Primary);
-
-        const row = new ActionRowBuilder().addComponents(button);
-
-        const messages = await channel.messages.fetch({ limit: 100 }).catch(e => {
-            console.error(`Failed to fetch messages in channel ${channel.id}:`, e.message);
-            return null;
-        });
-        const botMsg = messages?.find(m => m.author.id === client.user.id);
-
-        if (botMsg) {
-            await botMsg.edit({ embeds: [embed], components: [row] }).catch(e => console.error("Failed to edit bot message:", e.message));
+    if (interaction.customId === 'btn_pause') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        if (queue.node.isPlaying()) {
+            queue.node.setPaused(true);
+            await interaction.reply({ content: '⏸️ تم الإيقاف المؤقت', ephemeral: true });
         } else {
-            await channel.send({ embeds: [embed], components: [row] }).catch(e => console.error("Failed to send new bot message:", e.message));
+            queue.node.setPaused(false);
+            await interaction.reply({ content: '▶️ تم الاستئناف', ephemeral: true });
         }
-    } catch (e) {
-        console.error("خطأ في تحديث إمبد التقديم:", e);
+        return;
     }
-}
 
-// Discord Interaction Handling
-client.on("interactionCreate", async interaction => {
-    const Clan = require("./models/Clan");
-    const crypto = require("crypto");
-    try {
-        if (interaction.isModalSubmit() && interaction.customId.startsWith("clan_modal_")) {
-            const parts = interaction.customId.replace("clan_modal_", "").split("__");
-            const action = parts[0];
-            const clanIndex = parseInt(parts[1]);
-            const guildId = interaction.guild.id;
+    if (interaction.customId === 'btn_stop') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        queue.delete();
+        await interaction.reply({ content: '⏹️ تم إيقاف التشغيل ومغادرة القناة الصوتية', ephemeral: true });
+        return;
+    }
 
-            const clan = await Clan.findOne({ guildId, clanIndex });
-            if (!clan) return interaction.reply({ content: "الكلان غير موجود.", ephemeral: true });
+    if (interaction.customId === 'btn_next') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        if (queue.tracks.size <= 1) return interaction.reply({ content: '❌ لا يوجد أغاني في القائمة', ephemeral: true });
+        queue.node.skip();
+        await interaction.reply({ content: '⏭️ تم تخطي الأغنية', ephemeral: true });
+        return;
+    }
 
-            await interaction.deferReply({ ephemeral: true });
-            const targetId = interaction.fields.getTextInputValue("target_user_id").trim();
-            const member = await interaction.guild.members.fetch(targetId).catch(e => {
-                console.error(`Failed to fetch member ${targetId}:`, e.message);
-                return null;
-            });
-            const responseEmbed = new EmbedBuilder().setColor(0x38bdf8);
+    if (interaction.customId === 'btn_loop') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        queue.node.setRepeatMode(queue.node.getRepeatMode() === 0 ? 2 : 0);
+        const mode = queue.node.getRepeatMode() === 2 ? '🔁 تكرار القائمة مفعّل' : '⏭️ تم تعطيل التكرار';
+        await interaction.reply({ content: mode, ephemeral: true });
+        return;
+    }
 
-            if (action === "add_member") {
-                if (!member) return interaction.editReply({ content: "العضو غير موجود." });
-                if (!clan.members.some(m => m.userId === targetId)) {
-                    clan.members.push({ userId: targetId, points: 0, messageCount: 0, voiceMinutes: 0 });
-                    await clan.save();
-                }
-                if (clan.roleId && member) await member.roles.add(clan.roleId).catch(e => console.error(`Failed to add role to member ${targetId}:`, e.message));
-                responseEmbed.setTitle("تمت الإضافة").setDescription(`تم إضافة <@${targetId}> للكلان.`);
-                return interaction.editReply({ embeds: [responseEmbed] });
-            }
+    // أزرار الصوت
+    if (interaction.customId === 'btn_vol_down') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        const newVol = Math.max(1, queue.node.volume - 10);
+        queue.node.setVolume(newVol);
+        await interaction.reply({ content: `🔉 تم تخفيض الصوت إلى ${newVol}%`, ephemeral: true });
+        return;
+    }
 
-            if (action === "remove_member") {
-                clan.members = clan.members.filter(m => m.userId !== targetId);
-                await clan.save();
-                if (member && clan.roleId) await member.roles.remove(clan.roleId).catch(e => console.error(`Failed to remove role from member ${targetId}:`, e.message));
-                responseEmbed.setTitle("تم الطرد").setDescription(`تم طرد <@${targetId}> من الكلان.`);
-                return interaction.editReply({ embeds: [responseEmbed] });
-            }
+    if (interaction.customId === 'btn_vol_up') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        const newVol = Math.min(100, queue.node.volume + 10);
+        queue.node.setVolume(newVol);
+        await interaction.reply({ content: `🔊 تم رفع الصوت إلى ${newVol}%`, ephemeral: true });
+        return;
+    }
 
-            if (action === "check_member") {
-                const data = clan.members.find(m => m.userId === targetId);
-                responseEmbed.setTitle("إحصائيات العضو")
-                    .setDescription(`العضو: <@${targetId}>\nالنقاط: \`${data ? data.points : 0}\` \`${clan.pointsName}\`\nالرسائل: \`${data ? data.messageCount : 0}\`\nدقائق الصوت: \`${data ? data.voiceMinutes : 0}\``);
-                return interaction.editReply({ embeds: [responseEmbed] });
-            }
+    // أزرار القوائم
+    if (interaction.customId === 'btn_now_playing') {
+        if (!queue || !queue.currentTrack) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        await interaction.reply({
+            embeds: [createNowPlayingEmbed(queue.currentTrack, queue)],
+            ephemeral: true
+        });
+        return;
+    }
+
+    if (interaction.customId === 'btn_queue') {
+        if (!queue || queue.tracks.size === 0) return interaction.reply({ content: '❌ القائمة فارغة', ephemeral: true });
+        const tracks = queue.tracks.data.slice(0, 10);
+        const trackList = tracks.map((t, i) => `${i + 1}. **${truncate(t.cleanTitle, 60)}**`).join('\n');
+        await interaction.reply({
+            embeds: [new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('📋 قائمة التشغيل')
+                .setDescription(trackList)
+                .setFooter({ text: `المدة الكلية: ${formatQueueDuration(queue)} | عدد الأغاني: ${queue.tracks.size}` })
+            ],
+            ephemeral: true
+        });
+        return;
+    }
+
+    if (interaction.customId === 'btn_volume') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        await interaction.reply({
+            embeds: [new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('🔊 التحكم بالصوت')
+                .setDescription(`المستوى الحالي: **${queue.node.volume}%**`)
+                .addFields(
+                    { name: '\u200b', value: 'استخدم الأزرار لتعديل الصوت:', inline: false }
+                )
+            ],
+            components: [createVolumeButtons(queue.node.volume)],
+            ephemeral: true
+        });
+        return;
+    }
+
+    if (interaction.customId === 'btn_back_menu') {
+        await interaction.reply({
+            embeds: [new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('🎵 قائمة التحكم الرئيسية')
+                .setDescription('اختار من الأزرار أدناه للتحكم في المشغّل')
+            ],
+            components: [createControlButtons(), createMenuRow()],
+            ephemeral: true
+        });
+        return;
+    }
+
+    if (interaction.customId === 'btn_loop_mode') {
+        if (!queue || !queue.isPlaying()) return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+        const currentMode = queue.node.getRepeatMode();
+        const nextMode = currentMode === 0 ? 2 : currentMode === 2 ? 1 : 0;
+        queue.node.setRepeatMode(nextMode);
+        const modeText = nextMode === 0 ? 'بدون تكرار' : nextMode === 2 ? 'كرر القائمة' : 'كرر أغنية';
+        await interaction.reply({ content: `🔁 تم تغيير وضع التكرار إلى: **${modeText}**`, ephemeral: true });
+        return;
+    }
+
+    if (interaction.customId === 'btn_saves') {
+        const userSaves = getUserSaves(interaction.user.id);
+        if (userSaves.length === 0) {
+            return interaction.reply({ content: '💾 ليس لديك أي أغاني محفوظة! ستُضاف تلقائياً بعد انتهاء كل أغنية.', ephemeral: true });
         }
+        const saveList = userSaves.slice(0, 10).map((s, i) =>
+            `${i + 1}. **${truncate(s.title, 60)}** - ${s.author} (${formatDuration(s.duration)})`
+        ).join('\n');
+        await interaction.reply({
+            embeds: [new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('💾 محفوظاتي')
+                .setDescription(saveList)
+                .setFooter({ text: `إجمالي المحفوظات: ${userSaves.length} | استخدم /play [رابط] لإعادة تشغيلها` })
+            ],
+            ephemeral: true
+        });
+        return;
+    }
 
-        if (interaction.isButton() && interaction.customId.startsWith("applybtn_")) {
-            const parts = interaction.customId.split("_");
-            const guildId = parts[1];
-            const clanIndex = parseInt(parts[2]);
-            const clan = await Clan.findOne({ guildId, clanIndex });
+    if (interaction.customId === 'btn_skip_to') {
+        if (!queue || queue.tracks.size === 0) return interaction.reply({ content: '❌ لا يوجد أغاني في القائمة', ephemeral: true });
+        await interaction.reply({
+            embeds: [new EmbedBuilder()
+                .setColor(0x5865F2)
+                .setTitle('⏩ قائمة القفز')
+                .setDescription('رد برقم الأغنية للتخطي إليها')
+            ],
+            ephemeral: true
+        });
 
-            if (!clan) return interaction.reply({ content: "الكلان غير موجود.", ephemeral: true });
+        const filter = (m) => m.author.id === interaction.user.id && !isNaN(m.content);
+        const collector = interaction.channel.createMessageCollector({ filter, time: 15000, max: 1 });
 
-            const blacklistEntry = clan.blacklist.find(b => b.userId === interaction.user.id);
-            if (blacklistEntry && blacklistEntry.until > new Date()) {
-                return interaction.reply({ content: `أنت محظور من التقديم حالياً حتى ${blacklistEntry.until.toLocaleString()}.`, ephemeral: true });
-            }
-
-            await interaction.deferReply({ ephemeral: true });
-            const thread = await interaction.channel.threads.create({
-                name: `تقديم-${interaction.user.username}`,
-                autoArchiveDuration: 60,
-                type: ChannelType.PrivateThread,
-                reason: "طلب تقديم",
-                invitable: false
-            }).catch(e => {
-                console.error("Failed to create thread:", e.message);
-                return null;
-            });
-
-            if (!thread) return interaction.editReply({ content: "فشل إنشاء الروم. يرجى التأكد من صلاحيات البوت." });
-            await thread.members.add(interaction.user.id).catch(e => console.error("Failed to add user to thread:", e.message));
-            await interaction.editReply({ content: `تم فتح روم التقديم: ${thread}` });
-
-            const questions = clan.questions?.filter(q => q.trim() !== "") || ["السؤال 1", "السؤال 2", "السؤال 3"];
-            const answers = [];
-
-            for (let i = 0; i < questions.length; i++) {
-                await thread.send({ content: `**السؤال ${i + 1}:** ${questions[i]}` });
-                const collected = await thread.awaitMessages({ filter: m => m.author.id === interaction.user.id, max: 1, time: 120000, errors: ["time"] })
-                    .catch(e => {
-                        console.error("Failed to collect message in thread:", e.message);
-                        return null;
-                    });
-                if (!collected || collected.size === 0) {
-                    await thread.send({ content: "انتهى الوقت المخصص للإجابة أو حدث خطأ. سيتم إغلاق الروم." });
-                    return setTimeout(() => thread.delete().catch(e => console.error("Failed to delete thread after timeout:", e.message)), 5000);
-                }
-                answers.push(collected.first().content);
-            }
-
-            await thread.send({ content: "تم إرسال طلبك. سيتم مراجعته قريباً." });
-            await thread.setLocked(true).catch(e => console.error("Failed to lock thread:", e.message));
-            await thread.setArchived(true).catch(e => console.error("Failed to archive thread:", e.message));
-
-            const resultsChannel = await client.channels.fetch(clan.resultsChannelId).catch(e => {
-                console.error(`Failed to fetch results channel ${clan.resultsChannelId}:`, e.message);
-                return null;
-            });
-            if (resultsChannel) {
-                const embed = new EmbedBuilder().setTitle(`طلب انضمام: ${clan.clanName}`).setDescription(`المقدم: <@${interaction.user.id}>`).setColor(0xffff00);
-                questions.forEach((q, idx) => embed.addFields({ name: q, value: answers[idx] || "لا توجد إجابة", inline: false }));
-
-                const row = new ActionRowBuilder().addComponents(
-                    new ButtonBuilder().setCustomId(`accept_${guildId}_${interaction.user.id}_${clanIndex}_${clan.sessionToken}`).setLabel("قبول").setStyle(ButtonStyle.Success),
-                    new ButtonBuilder().setCustomId(`reject_${guildId}_${interaction.user.id}_${clanIndex}_${clan.sessionToken}`).setLabel("رفض").setStyle(ButtonStyle.Danger)
-                );
-                await resultsChannel.send({ embeds: [embed], components: [row] }).catch(e => console.error("Failed to send application to results channel:", e.message));
+        collector.on('collect', (msg) => {
+            const index = parseInt(msg.content) - 1;
+            if (index >= 0 && index < queue.tracks.size) {
+                queue.node.skipTo(index);
+                interaction.followUp({ content: `⏩ تم التخطي إلى الأغنية رقم ${index + 1}`, ephemeral: true });
             } else {
-                console.warn(`Results channel ${clan.resultsChannelId} not found for guild ${guildId}. Application not sent.`);
+                interaction.followUp({ content: '❌ رقم غير صحيح', ephemeral: true });
             }
-        }
+            msg.delete().catch(() => {});
+        });
 
-        if (interaction.isButton() && (interaction.customId.startsWith("accept_") || interaction.customId.startsWith("reject_"))) {
-            const [action, guildId, applicantId, clanIndexStr, token] = interaction.customId.split("_");
-            const clanIndex = parseInt(clanIndexStr);
-            const clan = await Clan.findOne({ guildId, clanIndex });
-
-            if (!clan) return interaction.reply({ content: "الكلان غير موجود.", ephemeral: true });
-            if (interaction.user.id !== clan.leaderId) return interaction.reply({ content: "لست القائد المخول لاتخاذ هذا الإجراء.", ephemeral: true });
-            if (clan.sessionToken !== token) return interaction.reply({ content: "الزر منتهي الصلاحية أو تم تحديث إعدادات الكلان. يرجى استخدام زر جديد.", ephemeral: true });
-
-            await interaction.deferReply({ ephemeral: true });
-            const applicant = await interaction.guild.members.fetch(applicantId).catch(e => {
-                console.error(`Failed to fetch applicant ${applicantId}:`, e.message);
-                return null;
-            });
-
-            if (!applicant) return interaction.editReply({ content: "لم يتم العثور على المتقدم في السيرفر." });
-
-            if (action === "accept") {
-                const allClans = await Clan.find({ guildId });
-                for (const c of allClans) {
-                    if (c.clanIndex !== clanIndex && c.roleId && applicant?.roles.cache.has(c.roleId)) {
-                        await applicant.roles.remove(c.roleId).catch(e => console.error(`Failed to remove role ${c.roleId} from ${applicantId}:`, e.message));
-                        c.members = c.members.filter(m => m.userId !== applicantId);
-                        await c.save().catch(e => console.error(`Failed to save clan ${c.clanName} after member removal:`, e.message));
-                    }
-                }
-                if (!clan.members.some(m => m.userId === applicantId)) {
-                    clan.members.push({ userId: applicantId, points: 0, messageCount: 0, voiceMinutes: 0 });
-                    await clan.save().catch(e => console.error(`Failed to save clan ${clan.clanName} after member addition:`, e.message));
-                }
-                if (clan.roleId && applicant) await applicant.roles.add(clan.roleId).catch(e => console.error(`Failed to add role ${clan.roleId} to ${applicantId}:`, e.message));
-                await interaction.editReply({ content: `تم قبول <@${applicantId}> في كلان ${clan.clanName}.` });
-                await applicant.send(`تهانينا! تم قبولك في كلان ${clan.clanName} في سيرفر ${interaction.guild.name}.`).catch(e => console.error("Failed to DM applicant:", e.message));
-            } else { // reject
-                const until = new Date();
-                until.setDate(until.getDate() + 3);
-                clan.blacklist.push({ userId: applicantId, until });
-                await clan.save().catch(e => console.error(`Failed to save clan ${clan.clanName} after blacklist:`, e.message));
-                await interaction.editReply({ content: `تم رفض <@${applicantId}> وتمت إضافته إلى القائمة السوداء لمدة 3 أيام.` });
-                await applicant.send(`للأسف، تم رفض طلب انضمامك إلى كلان ${clan.clanName} في سيرفر ${interaction.guild.name}. لن تتمكن من التقديم مرة أخرى لمدة 3 أيام.`).catch(e => console.error("Failed to DM applicant:", e.message));
+        collector.on('end', (collected) => {
+            if (collected.size === 0) {
+                interaction.followUp({ content: '⏰ انتهى الوقت', ephemeral: true });
             }
-            await interaction.message.delete().catch(e => console.error("Failed to delete interaction message:", e.message));
-        }
-
-        if (interaction.isStringSelectMenu() && interaction.customId.startsWith("leader_menu_")) {
-            const [_, __, guildId, clanIndexStr] = interaction.customId.split("_");
-            const clanIndex = parseInt(clanIndexStr);
-            const clan = await Clan.findOne({ guildId, clanIndex });
-            if (!clan) return interaction.reply({ content: "الكلان غير موجود.", ephemeral: true });
-            if (interaction.user.id !== clan.leaderId) return interaction.reply({ content: "لست القائد المخول لاستخدام هذه القائمة.", ephemeral: true });
-
-            const selection = interaction.values[0];
-            if (selection === "info") {
-                const embed = new EmbedBuilder().setTitle(`معلومات: ${clan.clanName}`).addFields(
-                    { name: "النقاط الكلية (الخزنة)", value: `${clan.clanVaultPoints} ${clan.pointsName}`, inline: true },
-                    { name: "عدد الأعضاء", value: `${clan.members.length}`, inline: true }
-                ).setColor(0x38bdf8);
-                return interaction.reply({ embeds: [embed], ephemeral: true });
-            }
-
-            if (selection === "total_points") {
-                return interaction.reply({ content: `نقاط الخزنة: ${clan.clanVaultPoints} ${clan.pointsName}`, ephemeral: true });
-            }
-
-            const modal = new ModalBuilder().setCustomId(`clan_modal_${selection}__${clanIndex}`).setTitle("تحكم العضو");
-            modal.addComponents(new ActionRowBuilder().addComponents(
-                new TextInputBuilder().setCustomId("target_user_id").setLabel("ID العضو").setStyle(TextInputStyle.Short).setRequired(true)
-            ));
-            await interaction.showModal(modal);
-        }
-    } catch (err) {
-        console.error("خطأ في معالجة التفاعل:", err);
-        if (interaction.deferred || interaction.replied) {
-            await interaction.editReply({ content: "حدث خطأ أثناء معالجة طلبك." }).catch(e => console.error("Failed to edit reply after error:", e.message));
-        } else {
-            await interaction.reply({ content: "حدث خطأ أثناء معالجة طلبك.", ephemeral: true }).catch(e => console.error("Failed to reply after error:", e.message));
-        }
+        });
+        return;
     }
 });
 
-// Message Create Event (for points system)
-const chatCooldowns = new Map();
-client.on("messageCreate", async message => {
-    if (message.author.bot || !message.guild) return;
+// ═══════════════════════════════════════════════════════════════════════════
+// ⌨️ معالجة الأوامر
+// ═══════════════════════════════════════════════════════════════════════════
 
-    const Clan = require("./models/Clan");
-    if (message.content === "تحكم") {
-        const clan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
-        if (clan && message.author.id === clan.leaderId) {
-            const menu = new StringSelectMenuBuilder().setCustomId(`leader_menu_${message.guild.id}_${clan.clanIndex}`).setPlaceholder("قائمة التحكم")
-                .addOptions([
-                    { label: "معلومات الكلان", value: "info" },
-                    { label: "إضافة عضو", value: "add_member" },
-                    { label: "طرد عضو", value: "remove_member" },
-                    { label: "إحصائيات عضو", value: "check_member" },
-                    { label: "نقاط الخزنة", value: "total_points" }
-                ]);
-            return message.reply({ content: "قائمة التحكم بالكلان:", components: [new ActionRowBuilder().addComponents(menu)], ephemeral: true });
-        }
-    }
+client.on(Events.InteractionCreate, async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
 
-    // Points System for messages
-    const activeClan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
-    if (activeClan) {
-        const last = chatCooldowns.get(message.author.id) || 0;
-        if (Date.now() - last < 3000 || message.content.length < 3) return;
-        chatCooldowns.set(message.author.id, Date.now());
-
-        let mIdx = activeClan.members.findIndex(m => m.userId === message.author.id);
-        if (mIdx === -1) {
-            activeClan.members.push({ userId: message.author.id, points: 0, messageCount: 0, voiceMinutes: 0 });
-            mIdx = activeClan.members.length - 1;
-        }
-        activeClan.members[mIdx].messageCount++;
-        if (activeClan.members[mIdx].messageCount >= 20) {
-            activeClan.members[mIdx].messageCount = 0;
-            activeClan.members[mIdx].points += 12;
-            activeClan.clanVaultPoints += 3;
-        }
-        await activeClan.save().catch(e => console.error("Failed to save clan after message points update:", e.message));
-    }
-});
-
-// Voice State Update Event (for voice minutes points system)
-const voiceStart = new Map();
-client.on("voiceStateUpdate", async (oldS, newS) => {
-    const Clan = require("./models/Clan");
-    const mId = newS.member?.id || oldS.member?.id;
-    const gId = newS.guild?.id || oldS.guild?.id;
-    if (!mId || !gId) return;
-
-    if (newS.channelId && !oldS.channelId) {
-        voiceStart.set(mId, Date.now());
-    }
-    else if (!newS.channelId && oldS.channelId) {
-        const start = voiceStart.get(mId);
-        if (start) {
-            const mins = Math.floor((Date.now() - start) / 60000);
-            if (mins >= 1) {
-                const clan = await Clan.findOne({ guildId: gId, voiceChannelId: oldS.channelId });
-                if (clan) {
-                    let mIdx = clan.members.findIndex(m => m.userId === mId);
-                    if (mIdx === -1) {
-                        clan.members.push({ userId: mId, points: 0, messageCount: 0, voiceMinutes: 0 });
-                        mIdx = clan.members.length - 1;
-                    }
-                    clan.members[mIdx].voiceMinutes += mins;
-                    const loops = Math.floor(mins / 20);
-                    if (loops >= 1) {
-                        clan.members[mIdx].points += (loops * 24);
-                        clan.clanVaultPoints += (loops * 6);
-                    }
-                    await clan.save().catch(e => console.error("Failed to save clan after voice points update:", e.message));
-                }
-            }
-            voiceStart.delete(mId);
-        }
-    }
-});
-
-// Guild Create Event (Bot joins a new guild)
-client.on("guildCreate", async guild => {
-    const Clan = require("./models/Clan");
     try {
-        const existingClans = await Clan.countDocuments({ guildId: guild.id });
-        if (existingClans === 0) {
-            const newClans = [];
-            for (let i = 1; i <= 8; i++) {
-                newClans.push({ clanIndex: i, guildId: guild.id });
+        // أمر التشغيل
+        if (interaction.commandName === 'play') {
+            await interaction.deferReply({ ephemeral: true });
+
+            const channel = interaction.member.voice.channel;
+            if (!channel) {
+                return interaction.followUp({ content: '❌ لازم تكون داخل قناة صوتية!' });
             }
-            await Clan.insertMany(newClans);
-            console.log(`Created 8 default clans for new guild: ${guild.name} (${guild.id})`);
+
+            if (!channel.permissionsFor(client.user).has(PermissionFlagsBits.Connect | PermissionFlagsBits.Speak)) {
+                return interaction.followUp({ content: '❌ ما عندي صلاحية للاتحاد بالكوال الصوتية' });
+            }
+
+            const query = interaction.options.getString('query', true);
+
+            try {
+                const { track } = await player.play(channel, query, {
+                    nodeOptions: {
+                        metadata: {
+                            channel: interaction.channel,
+                            userId: interaction.user.id
+                        },
+                    },
+                    requestedBy: interaction.user,
+                    searchEngine: query.startsWith('http') ? QueryType.AUTO : QueryType.YOUTUBE_SEARCH
+                });
+
+                const queue = player.queues.get(interaction.guild.id);
+                const isPlaylist = track.playlist !== null;
+
+                if (isPlaylist) {
+                    return interaction.followUp({
+                        embeds: [new EmbedBuilder()
+                            .setColor(0x00ff00)
+                            .setTitle('📋 تم إضافة قائمة تشغيل')
+                            .setDescription(`**${truncate(track.playlist.title, 100)}**\n📊 عدد الأغاني: ${track.playlist.tracks.length}\n👤 بواسطة: ${track.playlist.author}`)
+                        ]
+                    });
+                }
+
+                return interaction.followUp({
+                    embeds: [new EmbedBuilder()
+                        .setColor(0x00ff00)
+                        .setTitle('🎵 تم الإضافة للقائمة')
+                        .setThumbnail(track.thumbnail || null)
+                        .addFields(
+                            { name: 'الأغنية', value: `**${truncate(track.cleanTitle, 100)}**`, inline: true },
+                            { name: 'المدة', value: formatDuration(track.duration), inline: true },
+                            { name: 'بواسطة', value: track.author || 'غير معروف', inline: true },
+                            { name: '\u200b', value: `📊 عدد الأغاني في القائمة: ${queue.tracks.size}\n⏰ المدة الكلية: ${formatQueueDuration(queue)}`, inline: false }
+                        )
+                    ]
+                });
+            } catch (e) {
+            return interaction.followUp({
+                    embeds: [new EmbedBuilder()
+                        .setColor(0xff0000)
+                        .setTitle('❌ خطأ')
+                        .setDescription(`ما قدرت ألقا/ألعب الأغنية:\n\`${e.message || 'خطأ غير معروف'}\``)
+                    ]
+                });
+            }
+        }
+
+        // أمر التخطي
+        if (interaction.commandName === 'skip') {
+            const queue = player.queues.get(interaction.guild.id);
+            if (!queue || !queue.isPlaying()) {
+                return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+            }
+            queue.node.skip();
+            await interaction.reply({ content: '⏭️ تم تخطي الأغنية', ephemeral: true });
+        }
+
+        // أمر الإيقاف
+        if (interaction.commandName === 'stop') {
+            const queue = player.queues.get(interaction.guild.id);
+            if (!queue || !queue.isPlaying()) {
+                return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+            }
+            queue.delete();
+            await interaction.reply({ content: '⏹️ تم إيقاف التشغيل ومغادرة القناة الصوتية', ephemeral: true });
+        }
+
+        // أمر القائمة
+        if (interaction.commandName === 'queue') {
+            const queue = player.queues.get(interaction.guild.id);
+            if (!queue || queue.tracks.size === 0) {
+                return interaction.reply({ content: '❌ القائمة فارغة', ephemeral: true });
+            }
+
+            const tracks = queue.tracks.data;
+            const currentTrack = queue.currentTrack;
+            let description = '';
+
+            if (currentTrack) {
+                description += `🎵 **الآن:** ${truncate(currentTrack.cleanTitle, 80)}\n\n`;
+            }
+
+            const tracksToShow = tracks.slice(0, 15);
+            description += tracksToShow.map((t, i) =>
+                `**${i + 1}.** ${truncate(t.cleanTitle, 60)} \`${formatDuration(t.duration)}\``
+            ).join('\n');
+
+            if (tracks.length > 15) {
+                description += `\n\n... و ${tracks.length - 15} أغنية أخرى`;
+            }
+
+            await interaction.reply({
+                embeds: [new EmbedBuilder()
+                    .setColor(0x5865F2)
+                    .setTitle('📋 قائمة التشغيل')
+                    .setDescription(description)
+                    .setFooter({ text: `المدة الكلية: ${formatQueueDuration(queue)} | عدد الأغاني: ${tracks.length}` })
+                ],
+                ephemeral: true
+            });
+        }
+
+        // أمر المحفوظات
+        if (interaction.commandName === 'saves') {
+            const userSaves = getUserSaves(interaction.user.id);
+            if (userSaves.length === 0) {
+                return interaction.reply({
+                    embeds: [new EmbedBuilder()
+                        .setColor(0x5865F2)
+                        .setTitle('💾 محفوظاتي')
+                        .setDescription('ليس لديك أي أغاني محفوظة!\n\nستُضاف الأغاني تلقائياً بعد انتهاء كل أغنية.')
+                    ],
+                    ephemeral: true
+                });
+            }
+
+            const saveList = userSaves.map((s, i) =>
+                `**${i + 1}.** ${truncate(s.title, 60)} - ${s.author} \`${formatDuration(s.duration)}\``
+            ).join('\n');
+
+            await interaction.reply({
+                embeds: [new EmbedBuilder()
+                    .setColor(0x5865F2)
+                    .setTitle('💾 محفوظاتي')
+                    .setDescription(saveList)
+                    .setFooter({ text: `إجمالي المحفوظات: ${userSaves.length} | استخدم /play [رابط] لإعادة تشغيلها` })
+                ],
+                ephemeral: true
+            });
+        }
+
+        // أمر مسح المحفوظات
+        if (interaction.commandName === 'clearsaves') {
+            saves[interaction.user.id] = [];
+            saveSaves(saves);
+            await interaction.reply({ content: '🗑️ تم مسح جميع المحفوظات!', ephemeral: true });
+        }
+
+        // أمر الصوت
+        if (interaction.commandName === 'volume') {
+            const queue = player.queues.get(interaction.guild.id);
+            if (!queue || !queue.isPlaying()) {
+                return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+            }
+            const level = interaction.options.getInteger('level', true);
+            queue.node.setVolume(level);
+            await interaction.reply({
+                content: `🔊 تم ضبط الصوت إلى **${level}%**`,
+                ephemeral: true
+            });
+        }
+
+        // أمر التكرار
+        if (interaction.commandName === 'loop') {
+            const queue = player.queues.get(interaction.guild.id);
+            if (!queue || !queue.isPlaying()) {
+                return interaction.reply({ content: '❌ لا يوجد تشغيل حالياً', ephemeral: true });
+            }
+            const mode = interaction.options.getString('mode', true);
+            const modeMap = { off: 0, track: 1, queue: 2 };
+            queue.node.setRepeatMode(modeMap[mode]);
+            const modeText = mode === 'off' ? 'تم تعطيل التكرار' : mode === 'track' ? 'تم تفعيل تكرار الأغنية 🔂' : 'تم تفعيل تكرار القائمة 🔁';
+            await interaction.reply({ content: modeText, ephemeral: true });
+        }
+
+        // أمر البحث
+        if (interaction.commandName === 'search') {
+            await interaction.deferReply({ ephemeral: true });
+            const query = interaction.options.getString('query', true);
+
+            try {
+                const results = await player.search(query, {
+                    requestedBy: interaction.user,
+                    searchEngine: QueryType.YOUTUBE_SEARCH
+                });
+
+                if (!results.hasTracks() || results.tracks.length === 0) {
+                return interaction.followUp({ content: '❌ ما لقينا أي نتيجة', ephemeral: true });
+                }
+
+                const embeds = results.tracks.slice(0, 10).map((track, i) =>
+                    new EmbedBuilder()
+                        .setColor(0x5865F2)
+                        .setTitle(`#${i + 1} ${truncate(track.cleanTitle, 100)}`)
+                        .setThumbnail(track.thumbnail || null)
+                        .addFields(
+                            { name: 'بواسطة', value: track.author || 'غير معروف', inline: true },
+                            { name: 'المدة', value: formatDuration(track.duration), inline: true }
+                        )
+                        .setFooter({ text: 'استخدم /play مع اسم الأغنية لتشغيلها' })
+                );
+
+                await interaction.followUp({
+                    embeds: [embeds[0]],
+                    ephemeral: true
+                });
+            } catch (e) {
+                await interaction.followUp({ content: '❌ حدث خطأ أثناء البحث', ephemeral: true });
+            }
         }
     } catch (error) {
-        console.error(`Error creating default clans for new guild ${guild.id}:`, error);
+        console.error('❌ خطأ في معالجة الأمر:', error);
+        if (interaction.isRepliable()) {
+            try {
+                if (interaction.deferred || interaction.replied) {
+                    await interaction.followUp({ content: '❌ حدث خطأ غير متوقع', ephemeral: true });
+                } else {
+                    await interaction.reply({ content: '❌ حدث خطأ غير متوقع', ephemeral: true });
+                }
+            } catch (e) { /* ignore */ }
+        }
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
-app.listen(PORT, () => console.log(`الداشبورد يعمل على المنفذ: ${PORT}`));
+// ═══════════════════════════════════════════════════════════════════════════
+// 🚀 تشغيل البوت
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function startBot() {
+    // تحميل المستخرجين
+    try {
+        await player.extractors.loadMulti(DefaultExtractors);
+        console.log('✅ تم تحميل المستخرجين بنجاح');
+    } catch (error) {
+        console.warn('⚠️ تحذير في تحميل المستخرجين:', error.message);
+    }
+
+    // تسجيل الدخول
+    try {
+        await client.login(TOKEN);
+    } catch (error) {
+        console.error('❌ خطأ في تسجيل الدخول:', error.message);
+        console.error('تأكد من صحة التوكن في متغير البيئة DISCORD_TOKEN');
+        process.exit(1);
+    }
+}
+
+startBot();
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 📝 ملاحظات
+// ═══════════════════════════════════════════════════════════════════════════
+/*
+الأوامر المتاحة:
+/play [اسم الأغنية أو الرابط]  - تشغيل أغنية
+/skip                          - تخطي الأغنية الحالية
+/stop                          - إيقاف التشغيل
+/queue                         - عرض القائمة
+/saves                         - عرض المحفوظات
+/clearsaves                    - مسح المحفوظات
+/volume [1-100]                - تغيير الصوت
+/loop [off|track|queue]        - وضع التكرار
+/search [اسم الأغنية]         - بحث عن أغنية
+
+الميزات:
+- بحث ذكي من يوتيوب مع اقتراحات تلقائية
+- حفظ تلقائي للأغاني بعد انتهاءها
+- أزرار تحكم كاملة (تشغيل/إيقاف/تخطي/تكرار/صوت)
+- عرض معلومات الأغنية الحية مع شريط تقدم
+- دعم يوتيوب، سبوتيفاي، ساوندكلاود، وروابط مباشرة
+- بدون تقطيع في الصوت
+- واجهة تفاعلية جميلة
+
+للتشغيل:
+1. ضع التوكن في DISCORD_TOKEN
+2. npm install
+3. node index.js
+*/
