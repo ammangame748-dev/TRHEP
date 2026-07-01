@@ -43,19 +43,24 @@ passport.use(new DiscordStrategy({
     process.nextTick(() => done(null, profile));
 }));
 
-// Express Middleware - FIXED SESSION CONFIG
+// Express Middleware - FIXED
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// FIXED Session Configuration
 app.use(session({
     secret: process.env.SESSION_SECRET || "default-secret-change-in-env",
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
         secure: process.env.NODE_ENV === "production",
         maxAge: 24 * 60 * 60 * 1000, // 24 ساعة
-        sameSite: "lax",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         httpOnly: true
-    }
+    },
+    // استخدام MongoStore عشان الجلسة تتخزن في قاعدة البيانات (ممنوع تضيع عند الريفريش)
+    // إذا ما عندك mongodb-session: pip install connect-mongodb-session
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -87,7 +92,6 @@ app.get("/callback", passport.authenticate("discord", { failureRedirect: "/" }),
 
 app.get("/dashboard", checkAuth, (req, res) => {
     const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
-
     res.render("guild_selection", { adminGuilds });
 });
 
