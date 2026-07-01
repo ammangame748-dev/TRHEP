@@ -9,7 +9,9 @@
   "dependencies": {
     "discord.js": "^14.16.3",
     "discord-player": "^7.2.0",
-    "@discord-player/extractor": "^4.5.1",
-    "mediaplex": "^1.0.0"
+    "@discord-player/extractor": "^7.2.0",
+    "mediaplex": "^1.0.0",
+    "discord-api-types": "^0.37.109",
+    "@types/node": "^22.13.0"
   }
 }
