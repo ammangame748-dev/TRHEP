@@ -370,6 +370,9 @@
     </div>
 
     <script>
+           const guildId = window.__guildId__ || window.location.pathname.split('/').pop();
+    // بيانات السيرفرات (يتم حقنها من السيرفر في صفحة الداشبورد الرئيسية)
+    const adminGuilds = window.__adminGuilds__ || [];
         const guildId = window.location.pathname.split('/').pop();
         let allClansData = [];
         let guildMeta = { roles: [], textChannels: [], voiceChannels: [] };
