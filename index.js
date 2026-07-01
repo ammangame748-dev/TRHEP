@@ -56,7 +56,7 @@ app.use(session({
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         httpOnly: true
     }
-} ));
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -86,11 +86,27 @@ function readView(filename) {
     return fs.readFileSync(path.join(__dirname, "views", filename), "utf-8");
 }
 
+// دالة لحقن بيانات السيرفرات في HTML
+function injectGuildData(html, guildId = null) {
+    const adminGuilds = [];
+    if (typeof global.__cachedAdminGuilds__ !== 'undefined' && guildId === null) {
+        // For main dashboard, use cached guilds
+        return html.replace(
+            "<!-- GUILD_DATA -->",
+            `<script>window.__adminGuilds__ = ${JSON.stringify(global.__cachedAdminGuilds__)};</script>`
+        );
+    }
+
+    // Always fetch fresh guilds from session
+    return html;
+}
+
 app.get("/dashboard", checkAuth, (req, res) => {
     const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
+    // حفظ السيرفرات في متغير عام للاستخدام
+    req.session.adminGuilds = adminGuilds;
     // نعرض الداشبورد مباشرة مع إرسال بيانات السيرفرات
     let html = readView("dashboard.html");
-    // نوصل بيانات السيرفرات للـ HTML
     html = html.replace(
         "<!-- GUILD_DATA -->",
         `<script>window.__adminGuilds__ = ${JSON.stringify(adminGuilds)};</script>`
@@ -103,11 +119,12 @@ app.get("/dashboard/:guildId", checkAuth, async (req, res) => {
     const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
     if (!hasPerm) return res.status(403).send("غير مسموح لك بالوصول.");
 
+    const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
     let html = readView("dashboard.html");
-    // نوصل guildId للـ HTML
+    // نوصل guildId و adminGuilds للـ HTML
     html = html.replace(
         "<!-- GUILD_DATA -->",
-        `<script>window.__guildId__ = "${guildId}";</script>`
+        `<script>window.__guildId__ = "${guildId}"; window.__adminGuilds__ = ${JSON.stringify(adminGuilds)};</script>`
     );
     res.send(html);
 });
