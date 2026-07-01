@@ -43,14 +43,19 @@ passport.use(new DiscordStrategy({
     process.nextTick(() => done(null, profile));
 }));
 
-// Express Middleware
+// Express Middleware - FIXED SESSION CONFIG
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(session({
-    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex"), // Use environment variable for secret
+    secret: process.env.SESSION_SECRET || "default-secret-change-in-env",
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: process.env.NODE_ENV === "production" } // Secure cookies in production
+    cookie: {
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 24 * 60 * 60 * 1000, // 24 ساعة
+        sameSite: "lax",
+        httpOnly: true
+    }
 }));
 app.use(passport.initialize());
 app.use(passport.session());
@@ -71,7 +76,10 @@ function checkAuth(req, res, next) {
 }
 
 // Routes
-app.get("/", (req, res) => res.redirect("/login"));
+app.get("/", (req, res) => {
+    if (req.isAuthenticated()) return res.redirect("/dashboard");
+    res.redirect("/login");
+});
 app.get("/login", passport.authenticate("discord"));
 app.get("/callback", passport.authenticate("discord", { failureRedirect: "/" }), (req, res) => {
     res.redirect("/dashboard");
@@ -80,14 +88,14 @@ app.get("/callback", passport.authenticate("discord", { failureRedirect: "/" }),
 app.get("/dashboard", checkAuth, (req, res) => {
     const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
 
-    res.render("guild_selection", { adminGuilds }); // Render a dedicated EJS for guild selection
+    res.render("guild_selection", { adminGuilds });
 });
 
 app.get("/dashboard/:guildId", checkAuth, async (req, res) => {
     const guildId = req.params.guildId;
     const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
     if (!hasPerm) return res.status(403).send("غير مسموح لك بالوصول.");
-    res.render("dashboard", { guildId }); // Render the dashboard EJS file
+    res.render("dashboard", { guildId });
 });
 
 app.get("/api/guild-meta/:guildId", checkAuth, async (req, res) => {
@@ -95,7 +103,7 @@ app.get("/api/guild-meta/:guildId", checkAuth, async (req, res) => {
     if (!guild) return res.status(404).json({ error: "السيرفر غير موجود" });
 
     try {
-        await guild.members.fetch(); // Ensure members are cached for roles
+        await guild.members.fetch();
         const roles = guild.roles.cache.filter(r => r.name !== "@everyone").map(r => ({ id: r.id, name: r.name }));
         const channels = guild.channels.cache;
         const textChannels = channels.filter(c => c.type === ChannelType.GuildText).map(c => ({ id: c.id, name: c.name }));
@@ -113,7 +121,6 @@ app.get("/api/clans/:guildId", checkAuth, async (req, res) => {
     try {
         let clans = await Clan.find({ guildId }).sort({ clanIndex: 1 });
         if (clans.length === 0) {
-            // Initial creation of 8 clans if none exist for the guild
             const newClans = [];
             for (let i = 1; i <= 8; i++) {
                 newClans.push({ clanIndex: i, guildId: guildId });
@@ -134,17 +141,15 @@ app.post("/api/clans/update", checkAuth, async (req, res) => {
         const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
         if (!hasPerm) return res.status(403).send("غير مصرح لك.");
 
-        // Validate input (basic example)
         if (!guildId || !clanIndex) return res.status(400).send("بيانات غير كاملة.");
 
         const newToken = crypto.randomBytes(16).toString("hex");
         await Clan.findOneAndUpdate({ guildId, clanIndex: parseInt(clanIndex) }, {
             leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, resultsChannelId, applyContent, pointsName,
-            questions: [q1, q2, q3].filter(q => q && q.trim() !== ""), // Filter empty questions
+            questions: [q1, q2, q3].filter(q => q && q.trim() !== ""),
             sessionToken: newToken,
         }, { upsert: true, new: true });
 
-        // No redirect here, frontend will handle success message
         res.status(200).send("تم حفظ الإعدادات بنجاح!");
     } catch (err) {
         console.error("خطأ في حفظ إعدادات الكلان:", err);
@@ -190,7 +195,6 @@ async function updateApplyEmbed(guildId, clanIndex) {
 
         const row = new ActionRowBuilder().addComponents(button);
 
-        // Try to find existing bot message, otherwise send a new one
         const messages = await channel.messages.fetch({ limit: 100 }).catch(e => {
             console.error(`Failed to fetch messages in channel ${channel.id}:`, e.message);
             return null;
@@ -273,7 +277,7 @@ client.on("interactionCreate", async interaction => {
                 autoArchiveDuration: 60,
                 type: ChannelType.PrivateThread,
                 reason: "طلب تقديم",
-                invitable: false // Prevent non-staff from inviting others
+                invitable: false
             }).catch(e => {
                 console.error("Failed to create thread:", e.message);
                 return null;
@@ -354,15 +358,13 @@ client.on("interactionCreate", async interaction => {
                 }
                 if (clan.roleId && applicant) await applicant.roles.add(clan.roleId).catch(e => console.error(`Failed to add role ${clan.roleId} to ${applicantId}:`, e.message));
                 await interaction.editReply({ content: `تم قبول <@${applicantId}> في كلان ${clan.clanName}.` });
-                // Notify applicant
                 await applicant.send(`تهانينا! تم قبولك في كلان ${clan.clanName} في سيرفر ${interaction.guild.name}.`).catch(e => console.error("Failed to DM applicant:", e.message));
             } else { // reject
                 const until = new Date();
-                until.setDate(until.getDate() + 3); // Blacklist for 3 days
+                until.setDate(until.getDate() + 3);
                 clan.blacklist.push({ userId: applicantId, until });
                 await clan.save().catch(e => console.error(`Failed to save clan ${clan.clanName} after blacklist:`, e.message));
                 await interaction.editReply({ content: `تم رفض <@${applicantId}> وتمت إضافته إلى القائمة السوداء لمدة 3 أيام.` });
-                // Notify applicant
                 await applicant.send(`للأسف، تم رفض طلب انضمامك إلى كلان ${clan.clanName} في سيرفر ${interaction.guild.name}. لن تتمكن من التقديم مرة أخرى لمدة 3 أيام.`).catch(e => console.error("Failed to DM applicant:", e.message));
             }
             await interaction.message.delete().catch(e => console.error("Failed to delete interaction message:", e.message));
@@ -429,7 +431,7 @@ client.on("messageCreate", async message => {
     const activeClan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
     if (activeClan) {
         const last = chatCooldowns.get(message.author.id) || 0;
-        if (Date.now() - last < 3000 || message.content.length < 3) return; // 3 second cooldown and min 3 chars
+        if (Date.now() - last < 3000 || message.content.length < 3) return;
         chatCooldowns.set(message.author.id, Date.now());
 
         let mIdx = activeClan.members.findIndex(m => m.userId === message.author.id);
@@ -442,8 +444,6 @@ client.on("messageCreate", async message => {
             activeClan.members[mIdx].messageCount = 0;
             activeClan.members[mIdx].points += 12;
             activeClan.clanVaultPoints += 3;
-            // Optional: Notify user about points gain
-            // message.channel.send(`🎉 <@${message.author.id}> حصل على 12 ${activeClan.pointsName} لإرسال 20 رسالة!`);
         }
         await activeClan.save().catch(e => console.error("Failed to save clan after message points update:", e.message));
     }
@@ -454,13 +454,11 @@ const voiceStart = new Map();
 client.on("voiceStateUpdate", async (oldS, newS) => {
     const mId = newS.member?.id || oldS.member?.id;
     const gId = newS.guild?.id || oldS.guild?.id;
-    if (!mId || !gId) return; // Ensure member and guild are available
+    if (!mId || !gId) return;
 
-    // User joins a voice channel
     if (newS.channelId && !oldS.channelId) {
         voiceStart.set(mId, Date.now());
-    } 
-    // User leaves a voice channel
+    }
     else if (!newS.channelId && oldS.channelId) {
         const start = voiceStart.get(mId);
         if (start) {
@@ -474,13 +472,10 @@ client.on("voiceStateUpdate", async (oldS, newS) => {
                         mIdx = clan.members.length - 1;
                     }
                     clan.members[mIdx].voiceMinutes += mins;
-                    const loops = Math.floor(mins / 20); // 20 minutes for points
+                    const loops = Math.floor(mins / 20);
                     if (loops >= 1) {
                         clan.members[mIdx].points += (loops * 24);
                         clan.clanVaultPoints += (loops * 6);
-                        // Optional: Notify user about points gain
-                        // const member = await newS.guild.members.fetch(mId).catch(() => null);
-                        // if (member) member.send(`🎉 حصلت على ${loops * 24} ${clan.pointsName} للبقاء في الصوت لمدة ${mins} دقيقة!`).catch(e => console.error("Failed to DM voice points:", e.message));
                     }
                     await clan.save().catch(e => console.error("Failed to save clan after voice points update:", e.message));
                 }
