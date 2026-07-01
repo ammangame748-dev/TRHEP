@@ -2,144 +2,523 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>لوحة تحكم الكلانات</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم الكلان</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.3.0/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        body { font-family: sans-serif; background: #0f172a; color: #f1f5f9; padding: 20px; }
-        .container { max-width: 900px; margin: 0 auto; background: #1e293b; padding: 25px; border-radius: 12px; border: 1px solid #334155; }
-        h1, h2 { text-align: center; color: #38bdf8; }
-        .clan-card { background: #334155; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
-        label { display: block; margin-top: 10px; font-weight: bold; }
-        input, select, textarea { width: 100%; padding: 8px; margin-top: 5px; border-radius: 4px; border: 1px solid #475569; background: #1e293b; color: white; }
-        button { background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-top: 20px; width: 100%; }
-        button:hover { background: #0369a1; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .container-main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+
+        .tabs-container {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            overflow-x: auto;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid rgba(51, 65, 85, 0.5);
+        }
+
+        .tab-btn {
+            padding: 0.75rem 1.25rem;
+            background: rgba(30, 41, 59, 0.8);
+            border: 2px solid transparent;
+            color: #cbd5e1;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            background: rgba(51, 65, 85, 0.9);
+            border-color: #3b82f6;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #fff;
+            border-color: #1e40af;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.9);
+            border: 1px solid rgba(51, 65, 85, 0.7);
+            border-radius: 1rem;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #cbd5e1;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-input,
+        .form-select,
+        .form-textarea {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(71, 85, 105, 0.5);
+            border-radius: 0.5rem;
+            color: #e2e8f0;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+
+        .form-input:focus,
+        .form-select:focus,
+        .form-textarea:focus {
+            outline: none;
+            background: rgba(15, 23, 42, 0.95);
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 0.875rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: rgba(71, 85, 105, 0.8);
+            color: #e2e8f0;
+            border: 1px solid rgba(100, 116, 139, 0.5);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(71, 85, 105, 0.95);
+            border-color: #8b5cf6;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .alert-success {
+            background: rgba(34, 197, 94, 0.1);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #86efac;
+        }
+
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #fca5a5;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #e2e8f0;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .section-title i {
+            color: #3b82f6;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(51, 65, 85, 0.5);
+            margin: 2rem 0;
+        }
+
+        @media (max-width: 768px) {
+            .container-main {
+                padding: 1rem;
+            }
+
+            .header h1 {
+                font-size: 1.75rem;
+            }
+
+            .card {
+                padding: 1.5rem;
+            }
+
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>إعدادات الكلانات</h1>
-        <form action="/api/clans/update" method="POST">
-            <input type="hidden" name="guildId" id="guildId">
-            <label>اختر الكلان لتعديله:</label>
-            <select id="clanSelector" name="clanIndex" onchange="loadClanData()"></select>
+    <div class="container-main">
+        <div class="header">
+            <h1>⚡ لوحة تحكم الكلان</h1>
+            <p>إدارة متقدمة لكلاناتك</p>
+        </div>
 
-            <div class="clan-card">
-                <div class="grid">
-                    <div>
-                        <label>اسم الكلان</label>
-                        <input type="text" name="clanName" id="clanName">
-                    </div>
-                    <div>
-                        <label>ID القائد</label>
-                        <input type="text" name="leaderId" id="leaderId">
-                    </div>
-                </div>
+        <div class="card">
+            <div id="alert" class="alert"></div>
 
-                <div class="grid">
-                    <div>
-                        <label>رتبة الكلان</label>
-                        <select name="roleId" id="roleId"></select>
-                    </div>
-                    <div>
-                        <label>اسم النقاط</label>
-                        <input type="text" name="pointsName" id="pointsName">
-                    </div>
-                </div>
-
-                <div class="grid">
-                    <div>
-                        <label>روم الشات</label>
-                        <select name="textChannelId" id="textChannelId"></select>
-                    </div>
-                    <div>
-                        <label>روم الصوت</label>
-                        <select name="voiceChannelId" id="voiceChannelId"></select>
-                    </div>
-                </div>
-
-                <div class="grid">
-                    <div>
-                        <label>روم التقديم</label>
-                        <select name="applyChannelId" id="applyChannelId"></select>
-                    </div>
-                    <div>
-                        <label>روم النتائج</label>
-                        <select name="resultsChannelId" id="resultsChannelId"></select>
-                    </div>
-                </div>
-
-                <label>محتوى رسالة التقديم</label>
-                <textarea name="applyContent" id="applyContent" rows="3"></textarea>
-
-                <h3>أسئلة التقديم</h3>
-                <input type="text" name="q1" id="q1" placeholder="السؤال الأول">
-                <input type="text" name="q2" id="q2" placeholder="السؤال الثاني" style="margin-top:5px;">
-                <input type="text" name="q3" id="q3" placeholder="السؤال الثالث" style="margin-top:5px;">
+            <div class="section-title">
+                <i class="fas fa-cogs"></i>
+                إعدادات الكلان
             </div>
 
-            <button type="submit">حفظ التعديلات</button>
-        </form>
+            <div class="tabs-container" id="tabs-container"></div>
+
+            <form id="clan-settings-form">
+                <input type="hidden" id="guildId" name="guildId" value="">
+                <input type="hidden" id="clanIndex" name="clanIndex" value="1">
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">اسم الكلان</label>
+                        <input type="text" id="clanName" name="clanName" class="form-input" placeholder="أدخل اسم الكلان">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">معرف قائد الكلان</label>
+                        <input type="text" id="leaderId" name="leaderId" class="form-input" placeholder="معرف العضو">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">دور الكلان</label>
+                        <select id="roleId" name="roleId" class="form-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">قناة الدردشة</label>
+                        <select id="textChannelId" name="textChannelId" class="form-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">قناة الصوت</label>
+                        <select id="voiceChannelId" name="voiceChannelId" class="form-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">قناة التقديمات</label>
+                        <select id="applyChannelId" name="applyChannelId" class="form-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">قناة النتائج</label>
+                        <select id="resultsChannelId" name="resultsChannelId" class="form-select"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">اسم النقاط</label>
+                        <input type="text" id="pointsName" name="pointsName" class="form-input" placeholder="مثال: نقطة، عملة">
+                    </div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="section-title">
+                    <i class="fas fa-message"></i>
+                    محتوى التقديم
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">رسالة التقديم</label>
+                    <textarea id="applyContent" name="applyContent" class="form-textarea" placeholder="أدخل محتوى رسالة التقديم"></textarea>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="section-title">
+                    <i class="fas fa-question-circle"></i>
+                    أسئلة التقديم
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="form-label">السؤال الأول</label>
+                        <input type="text" id="q1" name="q1" class="form-input" placeholder="أدخل السؤال الأول">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">السؤال الثاني</label>
+                        <input type="text" id="q2" name="q2" class="form-input" placeholder="أدخل السؤال الثاني">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">السؤال الثالث</label>
+                        <input type="text" id="q3" name="q3" class="form-input" placeholder="أدخل السؤال الثالث">
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        حفظ الإعدادات
+                    </button>
+                    <button type="button" id="update-embed-btn" class="btn btn-secondary">
+                        <i class="fas fa-sync-alt"></i>
+                        تحديث الرسالة
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     <script>
         const guildId = window.location.pathname.split('/').pop();
-        document.getElementById('guildId').value = guildId;
+        let allClansData = [];
+        let guildMeta = { roles: [], textChannels: [], voiceChannels: [] };
 
-        async function init() {
-            // تحميل القنوات والرتب
-            const meta = await fetch(`/api/guild-meta/${guildId}`).then(r => r.json());
-            
-            const fillSelect = (id, items, type) => {
-                const s = document.getElementById(id);
-                s.innerHTML = '<option value="">اختر ' + type + '</option>';
-                items.forEach(i => {
-                    const opt = document.createElement('option');
-                    opt.value = i.id;
-                    opt.textContent = i.name;
-                    s.appendChild(opt);
-                });
+        function showAlert(message, type = 'success') {
+            const alert = document.getElementById('alert');
+            alert.textContent = message;
+            alert.className = `alert alert-${type} show`;
+            setTimeout(() => alert.classList.remove('show'), 4000);
+        }
+
+        async function fetchGuildMeta() {
+            try {
+                const res = await fetch(`/api/guild-meta/${guildId}`);
+                if (!res.ok) throw new Error('Failed to fetch guild meta');
+                guildMeta = await res.json();
+                populateSelects();
+            } catch (error) {
+                console.error('Error fetching guild meta:', error);
+                showAlert('فشل تحميل بيانات السيرفر', 'error');
+            }
+        }
+
+        function populateSelects() {
+            const selects = {
+                roleId: document.getElementById("roleId"),
+                textChannelId: document.getElementById("textChannelId"),
+                voiceChannelId: document.getElementById("voiceChannelId"),
+                applyChannelId: document.getElementById("applyChannelId"),
+                resultsChannelId: document.getElementById("resultsChannelId")
             };
 
-            fillSelect('roleId', meta.roles, 'رتبة');
-            fillSelect('textChannelId', meta.textChannels, 'قناة كتابية');
-            fillSelect('voiceChannelId', meta.voiceChannels, 'قناة صوتية');
-            fillSelect('applyChannelId', meta.textChannels, 'قناة كتابية');
-            fillSelect('resultsChannelId', meta.textChannels, 'قناة كتابية');
-
-            // تحميل الكلانات
-            const clans = await fetch(`/api/clans/${guildId}`).then(r => r.json());
-            const selector = document.getElementById('clanSelector');
-            clans.forEach(c => {
-                const opt = document.createElement('option');
-                opt.value = c.clanIndex;
-                opt.textContent = 'كلان ' + c.clanIndex + (c.clanName ? ': ' + c.clanName : '');
-                selector.appendChild(opt);
+            Object.values(selects).forEach(select => {
+                select.innerHTML = '<option value="">-- اختر --</option>';
             });
 
-            window.allClans = clans;
-            loadClanData();
+            guildMeta.roles.forEach(role => {
+                selects.roleId.innerHTML += `<option value="${role.id}">${role.name}</option>`;
+            });
+
+            guildMeta.textChannels.forEach(channel => {
+                selects.textChannelId.innerHTML += `<option value="${channel.id}">${channel.name}</option>`;
+                selects.applyChannelId.innerHTML += `<option value="${channel.id}">${channel.name}</option>`;
+                selects.resultsChannelId.innerHTML += `<option value="${channel.id}">${channel.name}</option>`;
+            });
+
+            guildMeta.voiceChannels.forEach(channel => {
+                selects.voiceChannelId.innerHTML += `<option value="${channel.id}">${channel.name}</option>`;
+            });
         }
 
-        function loadClanData() {
-            const idx = document.getElementById('clanSelector').value;
-            const clan = window.allClans.find(c => c.clanIndex == idx);
-            if (!clan) return;
-
-            document.getElementById('clanName').value = clan.clanName || '';
-            document.getElementById('leaderId').value = clan.leaderId || '';
-            document.getElementById('roleId').value = clan.roleId || '';
-            document.getElementById('pointsName').value = clan.pointsName || 'نقطة';
-            document.getElementById('textChannelId').value = clan.textChannelId || '';
-            document.getElementById('voiceChannelId').value = clan.voiceChannelId || '';
-            document.getElementById('applyChannelId').value = clan.applyChannelId || '';
-            document.getElementById('resultsChannelId').value = clan.resultsChannelId || '';
-            document.getElementById('applyContent').value = clan.applyContent || '';
-            document.getElementById('q1').value = clan.questions[0] || '';
-            document.getElementById('q2').value = clan.questions[1] || '';
-            document.getElementById('q3').value = clan.questions[2] || '';
+        async function fetchClans() {
+            try {
+                const res = await fetch(`/api/clans/${guildId}`);
+                if (!res.ok) throw new Error('Failed to fetch clans');
+                allClansData = await res.json();
+                renderTabs();
+                loadClanSettings(1);
+            } catch (error) {
+                console.error('Error fetching clans:', error);
+                showAlert('فشل تحميل بيانات الكلانات', 'error');
+            }
         }
 
-        init();
+        function renderTabs() {
+            const container = document.getElementById('tabs-container');
+            container.innerHTML = '';
+            for (let i = 1; i <= 8; i++) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `tab-btn ${i === 1 ? 'active' : ''}`;
+                btn.textContent = `الكلان ${i}`;
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('clanIndex').value = i;
+                    loadClanSettings(i);
+                });
+                container.appendChild(btn);
+            }
+        }
+
+        function loadClanSettings(clanIndex) {
+            const clan = allClansData.find(c => c.clanIndex == clanIndex);
+            if (clan) {
+                document.getElementById("clanName").value = clan.clanName || '';
+                document.getElementById("leaderId").value = clan.leaderId || '';
+                document.getElementById("roleId").value = clan.roleId || '';
+                document.getElementById("textChannelId").value = clan.textChannelId || '';
+                document.getElementById("voiceChannelId").value = clan.voiceChannelId || '';
+                document.getElementById("applyChannelId").value = clan.applyChannelId || '';
+                document.getElementById("resultsChannelId").value = clan.resultsChannelId || '';
+                document.getElementById("applyContent").value = clan.applyContent || '';
+                document.getElementById("pointsName").value = clan.pointsName || '';
+                document.getElementById("q1").value = clan.questions[0] || '';
+                document.getElementById("q2").value = clan.questions[1] || '';
+                document.getElementById("q3").value = clan.questions[2] || '';
+            }
+        }
+
+        document.getElementById("clan-settings-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.guildId = guildId;
+
+            try {
+                const res = await fetch("/api/clans/update", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(data),
+                });
+                if (res.ok) {
+                    showAlert('✓ تم حفظ الإعدادات بنجاح', 'success');
+                    fetchClans();
+                } else {
+                    const errorText = await res.text();
+                    showAlert(`✗ ${errorText}`, 'error');
+                }
+            } catch (error) {
+                console.error("Error saving clan settings:", error);
+                showAlert('✗ حدث خطأ أثناء الحفظ', 'error');
+            }
+        });
+
+        document.getElementById("update-embed-btn").addEventListener("click", async () => {
+            const clanIndex = document.getElementById("clanIndex").value;
+            try {
+                const res = await fetch("/api/update-embed", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ guildId, clanIndex: parseInt(clanIndex) }),
+                });
+                if (res.ok) {
+                    showAlert('✓ تم تحديث الرسالة بنجاح', 'success');
+                } else {
+                    const errorText = await res.text();
+                    showAlert(`✗ ${errorText}`, 'error');
+                }
+            } catch (error) {
+                console.error("Error updating embed:", error);
+                showAlert('✗ حدث خطأ أثناء التحديث', 'error');
+            }
+        });
+
+        document.getElementById("guildId").value = guildId;
+        fetchGuildMeta();
+        fetchClans();
     </script>
 </body>
 </html>
