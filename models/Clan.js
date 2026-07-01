@@ -1,46 +1,35 @@
 const mongoose = require('mongoose');
 
 const clanSchema = new mongoose.Schema({
-    guildId: { type: String, required: true }, 
-    clanIndex: { type: Number, required: true }, 
-    leaderId: { type: String, default: '' },
-    clanName: { type: String, default: '' },
-    roleId: { type: String, default: '' },
-    textChannelId: { type: String, default: '' },
-    voiceChannelId: { type: String, default: '' },
-    applyChannelId: { type: String, default: '' },
-    interviewChannelId: { type: String, default: '' },
-    resultsChannelId: { type: String, default: '' },
-    applyContent: { type: String, default: '' },
+    guildId: { type: String, required: true },
+    clanIndex: { type: Number, required: true },
+    clanName: { type: String, default: 'كلان بدون اسم' },
+    leaderId: { type: String, default: null },
+    roleId: { type: String, default: null },
+    textChannelId: { type: String, default: null },
+    voiceChannelId: { type: String, default: null },
+    applyChannelId: { type: String, default: null },
+    interviewChannelId: { type: String, default: null },
+    resultsChannelId: { type: String, default: null },
+    applyContent: { type: String, default: 'اضغط على الزر أدناه للتقديم' },
     pointsName: { type: String, default: 'نقاط' },
-    questions: {
-        type: [String],
-        default: ['السؤال الأول', 'السؤال الثاني', 'السؤال الثالث']
-    },
-    
-    // [تعديل 1] خزنة الكلان المستقلة الثابتة التي لا تتأثر بمغادرة الأعضاء
-    clanVaultPoints: { type: Number, default: 0 },
-    
-    // [تعديل 2] مفتاح الأمان المشفر لمنع استغلال الأزرار المعلقة وقفل هوية القائد
-    sessionToken: { type: String, default: '' },
-
-    // [تعديل 3] المصفوفة الموحدة للأعضاء لتسهيل الفلترة والتصدر وتتبع الإحصائيات
+    questions: [{ type: String }],
     members: [{
-        userId: { type: String, required: true },
+        userId: String,
         points: { type: Number, default: 0 },
         messageCount: { type: Number, default: 0 },
-        voiceMinutes: { type: Number, default: 0 },
-        joinDate: { type: Date, default: Date.now }
+        voiceMinutes: { type: Number, default: 0 }
     }],
-
-    // سجل حظر التقديم المؤقت للأعضاء المرفوضين لمنع الإغراق
+    clanVaultPoints: { type: Number, default: 0 },
     blacklist: [{
-        userId: { type: String, required: true },
-        until: { type: Date, required: true }
-    }]
+        userId: String,
+        until: Date,
+        reason: String
+    }],
+    sessionToken: { type: String, default: null },
+    createdAt: { type: Date, default: Date.now }
 });
 
-// منع تكرار نفس رقم الكلان داخل نفس السيرفر
 clanSchema.index({ guildId: 1, clanIndex: 1 }, { unique: true });
 
 module.exports = mongoose.model('Clan', clanSchema);
