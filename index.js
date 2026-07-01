@@ -6,11 +6,10 @@ const passport = require("passport");
 const DiscordStrategy = require("passport-discord").Strategy;
 const mongoose = require("mongoose");
 const path = require("path");
-const crypto = require("crypto");
-const Clan = require("./models/Clan");
+const fs = require("fs");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI)
@@ -43,31 +42,23 @@ passport.use(new DiscordStrategy({
     process.nextTick(() => done(null, profile));
 }));
 
-// Express Middleware - FIXED
+// Express Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// FIXED Session Configuration
 app.use(session({
-    secret: process.env.SESSION_SECRET || "default-secret-change-in-env",
+    secret: process.env.SESSION_SECRET || "change-this-to-a-long-random-secret",
     resave: false,
     saveUninitialized: false,
     proxy: true,
     cookie: {
         secure: process.env.NODE_ENV === "production",
-        maxAge: 24 * 60 * 60 * 1000, // 24 ساعة
+        maxAge: 24 * 60 * 60 * 1000,
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         httpOnly: true
-    },
-    // استخدام MongoStore عشان الجلسة تتخزن في قاعدة البيانات (ممنوع تضيع عند الريفريش)
-    // إذا ما عندك mongodb-session: pip install connect-mongodb-session
-}));
+    }
+} ));
 app.use(passport.initialize());
 app.use(passport.session());
-
-// Set EJS as the view engine
-app.set("view engine", "ejs");
-app.set("views", path.join(__dirname, "views"));
 
 // Helper function for permission checking
 function hasAdminPermissions(guildPermissions) {
@@ -90,16 +81,35 @@ app.get("/callback", passport.authenticate("discord", { failureRedirect: "/" }),
     res.redirect("/dashboard");
 });
 
+// دالة تقرأ ملف HTML وترجعه كـ string
+function readView(filename) {
+    return fs.readFileSync(path.join(__dirname, "views", filename), "utf-8");
+}
+
 app.get("/dashboard", checkAuth, (req, res) => {
     const adminGuilds = req.user.guilds.filter(guild => hasAdminPermissions(guild.permissions));
-    res.render("guild_selection", { adminGuilds });
+    // نعرض الداشبورد مباشرة مع إرسال بيانات السيرفرات
+    let html = readView("dashboard.html");
+    // نوصل بيانات السيرفرات للـ HTML
+    html = html.replace(
+        "<!-- GUILD_DATA -->",
+        `<script>window.__adminGuilds__ = ${JSON.stringify(adminGuilds)};</script>`
+    );
+    res.send(html);
 });
 
 app.get("/dashboard/:guildId", checkAuth, async (req, res) => {
     const guildId = req.params.guildId;
     const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
     if (!hasPerm) return res.status(403).send("غير مسموح لك بالوصول.");
-    res.render("dashboard", { guildId });
+
+    let html = readView("dashboard.html");
+    // نوصل guildId للـ HTML
+    html = html.replace(
+        "<!-- GUILD_DATA -->",
+        `<script>window.__guildId__ = "${guildId}";</script>`
+    );
+    res.send(html);
 });
 
 app.get("/api/guild-meta/:guildId", checkAuth, async (req, res) => {
@@ -122,6 +132,7 @@ app.get("/api/guild-meta/:guildId", checkAuth, async (req, res) => {
 
 app.get("/api/clans/:guildId", checkAuth, async (req, res) => {
     const guildId = req.params.guildId;
+    const Clan = require("./models/Clan");
     try {
         let clans = await Clan.find({ guildId }).sort({ clanIndex: 1 });
         if (clans.length === 0) {
@@ -141,6 +152,8 @@ app.get("/api/clans/:guildId", checkAuth, async (req, res) => {
 
 app.post("/api/clans/update", checkAuth, async (req, res) => {
     const { guildId, clanIndex, leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, resultsChannelId, applyContent, pointsName, q1, q2, q3 } = req.body;
+    const Clan = require("./models/Clan");
+    const crypto = require("crypto");
     try {
         const hasPerm = req.user.guilds.some(g => g.id === guildId && hasAdminPermissions(g.permissions));
         if (!hasPerm) return res.status(403).send("غير مصرح لك.");
@@ -177,6 +190,7 @@ app.post("/api/update-embed", checkAuth, async (req, res) => {
 
 // Discord Bot Functions
 async function updateApplyEmbed(guildId, clanIndex) {
+    const Clan = require("./models/Clan");
     try {
         const clan = await Clan.findOne({ guildId, clanIndex });
         if (!clan || !clan.applyChannelId) return console.log(`No clan or applyChannelId for guild ${guildId}, clan ${clanIndex}`);
@@ -217,6 +231,8 @@ async function updateApplyEmbed(guildId, clanIndex) {
 
 // Discord Interaction Handling
 client.on("interactionCreate", async interaction => {
+    const Clan = require("./models/Clan");
+    const crypto = require("crypto");
     try {
         if (interaction.isModalSubmit() && interaction.customId.startsWith("clan_modal_")) {
             const parts = interaction.customId.replace("clan_modal_", "").split("__");
@@ -415,7 +431,7 @@ const chatCooldowns = new Map();
 client.on("messageCreate", async message => {
     if (message.author.bot || !message.guild) return;
 
-    // Clan Leader Control Command
+    const Clan = require("./models/Clan");
     if (message.content === "تحكم") {
         const clan = await Clan.findOne({ guildId: message.guild.id, textChannelId: message.channel.id });
         if (clan && message.author.id === clan.leaderId) {
@@ -456,6 +472,7 @@ client.on("messageCreate", async message => {
 // Voice State Update Event (for voice minutes points system)
 const voiceStart = new Map();
 client.on("voiceStateUpdate", async (oldS, newS) => {
+    const Clan = require("./models/Clan");
     const mId = newS.member?.id || oldS.member?.id;
     const gId = newS.guild?.id || oldS.guild?.id;
     if (!mId || !gId) return;
@@ -491,6 +508,7 @@ client.on("voiceStateUpdate", async (oldS, newS) => {
 
 // Guild Create Event (Bot joins a new guild)
 client.on("guildCreate", async guild => {
+    const Clan = require("./models/Clan");
     try {
         const existingClans = await Clan.countDocuments({ guildId: guild.id });
         if (existingClans === 0) {
