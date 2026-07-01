@@ -124,16 +124,23 @@ app.post('/api/clans/update', checkAuth, async (req, res) => {
         const hasPerm = req.user.guilds.some(g => g.id === guildId && ((g.permissions & 0x8) === 0x8 || (g.permissions & 0x20) === 0x20));
         if (!hasPerm) return res.status(403).send('غير مصرح لك بتعديل بيانات هذا السيرفر.');
 
+        // تحويل الفهرس إلى رقم والتحقق من صحته لمنع خطأ CastError (NaN)
+        const parsedClanIndex = parseInt(clanIndex, 10);
+        if (isNaN(parsedClanIndex)) {
+            return res.status(400).send('خطأ: معرف الكلان (clanIndex) يجب أن يكون رقماً صالحاً.');
+        }
+
         // توليد توكن فريد مشفر لكل تحديث لنسف تفعيل الأزرار العتيقة في غرف القادة السابقة
         const newToken = require('crypto').randomBytes(16).toString('hex');
 
-        await Clan.findOneAndUpdate({ guildId, clanIndex: parseInt(clanIndex) }, {
+        // استخدام المتغير الرقمي الآمن الممتثل لشروط قاعدة البيانات
+        await Clan.findOneAndUpdate({ guildId, clanIndex: parsedClanIndex }, {
             leaderId, clanName, roleId, textChannelId, voiceChannelId, applyChannelId, interviewChannelId, resultsChannelId, applyContent, pointsName,
             questions: [q1, q2, q3],
             sessionToken: newToken
         }, { upsert: true });
 
-        await updateApplyEmbed(guildId, parseInt(clanIndex));
+        await updateApplyEmbed(guildId, parsedClanIndex);
         res.redirect('/dashboard/' + guildId);
     } catch (err) {
         console.error(err);
