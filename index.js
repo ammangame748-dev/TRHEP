@@ -593,7 +593,8 @@ function updateBlackjackDisplay(interaction, gameData, dealerReveal) {
   const embed = createEmbed('🃏 بلاك جاك', `💰 رهانك: ${formatCoins(betAmount)}\n\n**الموزع:** ${dealerCards}\n**أنت:** ${playerHand.map(cardToString).join(' ')}\n🔢 مجموعك: ${handTotal(playerHand)}`, '#2ECC71');
   
   if (handTotal(playerHand) > 21) {
-    embed.setDescription(embed.data.description + '\n\n💥 **تجاوزت الـ 21! خسرت!**');
+    embed.setDescription(embed.data.description + '\n\n**BUST!** 😭 لقد تجاوزت 21! خسرت رهانك.');
+    updateCoins(gameData.userId, -gameData.betAmount);
     activeGames.delete(`${gameData.userId}_blackjack`);
     recordLoss(gameData.userId);
     return interaction.reply ? interaction.reply({ embeds: [embed] }) : interaction.editReply({ embeds: [embed], components: [] });
